@@ -1,0 +1,10 @@
+.vscode
+bin
+*.o
+*.exe
+test.*
+*.out
+*.log
+.DS_store
+.clang_complete
+seabattle
