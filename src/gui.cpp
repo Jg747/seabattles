@@ -3,6 +3,7 @@
 #include <debug.hpp>
 
 #include <string>
+#include <cmath>
 
 using std::to_string;
 
@@ -72,7 +73,7 @@ void Gui::init_game_windows() {
 	// SEA
 	init_sea();
 
-	actions_border = newwin(line, (COLS * (100 - PERCENT_SEA) / 100) - 3, 2, 2 + col);
+	actions_border = newwin(line, (COLS * (100 - PERCENT_SEA) / 100) - 3 + (COLS - 2 - (col + 1 + (COLS * (100 - PERCENT_SEA) / 100) - 3)), 2, 2 + col);
 	box(actions_border, ACS_VLINE, ACS_HLINE);
 
 	wrefresh(actions_border);
