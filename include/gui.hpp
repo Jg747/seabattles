@@ -30,21 +30,19 @@ class Gui {
 	public:
 		Gui();
 		~Gui();
-		void start();
+		bool start();
 	
 	private:
 		WINDOW *game_wrapper[2];
 		WINDOW *start_menu[2];
 
-		WINDOW *my_grid[2];
-		WINDOW *enemy_grid[2];
+		WINDOW *sea_border;
 		WINDOW *sea[BOARD_SIZE + 1][BOARD_SIZE + 1];
-
-		WINDOW *actions_border;
 		WINDOW *actions[2];
-		WINDOW *submenu[2];
 
 		Match *m;
+
+		enum game_status_e status;
 
 		void del_array_win(WINDOW *array[], int len);
 		void init_gui();
@@ -52,14 +50,21 @@ class Gui {
 		void init_sea();
 
 		int game_menu();
-		void place_ships();
+		int actions_menu(enum action_e a);
+		bool place_ships();
+		int place_a_ship(int index);
+		enum game_status_e make_actions();
 
 		void get_win_size(WINDOW *w, int &width, int &height);
 		void write_on_window(WINDOW *w, string str);
 		void mvwrite_on_window(WINDOW *w, int x, int y, string str);
 		string get_input(WINDOW *w);
-		int menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol);
-		void paint_sea();
+		int menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool step_last);
+		
+		void paint_sea(bool my_sea);
+		void paint_actions_menu(enum action_e a, int &width, int &height);
+		void paint_ship(int index, Ship *&ship, bool my_sea);
+		void color_tile(int i, int j, enum colors color);
 };
 
 #endif

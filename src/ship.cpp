@@ -39,57 +39,55 @@ string Ship::info() {
 }
 
 int Ship::place_ship(enum command_e cmd) {
-	this->isPlaced = false;
-	while (!this->isPlaced) {
-		switch (cmd) {
-			case MOVE_UP:
-				if (pos_y-1 >= 0) {
-					if (this->rotation == UP) {
-						if (this->pos_y - this->length >= 0) {
-							this->pos_y--;
-						}
-					} else {
+	switch (cmd) {
+		case MOVE_UP:
+			if (pos_y-1 >= 0) {
+				if (this->rotation == UP) {
+					if (this->pos_y - this->length >= 0) {
 						this->pos_y--;
 					}
+				} else {
+					this->pos_y--;
 				}
-				break;
-			case MOVE_RIGHT:
-				if (pos_x+1 < BOARD_SIZE) {
-					if (this->rotation == RIGHT) {
-						if (this->pos_x + this->length < BOARD_SIZE) {
-							this->pos_x++;
-						}
-					} else {
+			}
+			break;
+		case MOVE_RIGHT:
+			if (pos_x+1 < BOARD_SIZE) {
+				if (this->rotation == RIGHT) {
+					if (this->pos_x + this->length < BOARD_SIZE) {
 						this->pos_x++;
 					}
+				} else {
+					this->pos_x++;
 				}
-				break;
-			case MOVE_DOWN:
-				if (pos_y+1 < BOARD_SIZE) {
-					if (this->rotation == DOWN) {
-						if (this->pos_y + this->length < BOARD_SIZE) {
-							this->pos_y++;
-						}
-					} else {
-						this->pos_y++;;
+			}
+			break;
+		case MOVE_DOWN:
+			if (pos_y+1 < BOARD_SIZE) {
+				if (this->rotation == DOWN) {
+					if (this->pos_y + this->length < BOARD_SIZE) {
+						this->pos_y++;
 					}
+				} else {
+					this->pos_y++;;
 				}
-				break;
-			case MOVE_LEFT:
-				if (pos_x-1 >= 0) {
-					if (this->rotation == LEFT) {
-						if (this->pos_x - this->length >= 0) {
-							this->pos_x--;
-						}
-					} else {
+			}
+			break;
+		case MOVE_LEFT:
+			if (pos_x-1 >= 0) {
+				if (this->rotation == LEFT) {
+					if (this->pos_x - this->length >= 0) {
 						this->pos_x--;
 					}
+				} else {
+					this->pos_x--;
 				}
-				break;
-			case ROTATE:
-				switch (this->rotation) {
-					case UP:
-						this->pos_x -= (this->length - 1);
+			}
+			break;
+		case ROTATE:
+			switch (this->rotation) {
+				case UP:
+					this->pos_x -= (this->length - 1);
 						if (pos_x < 0) {
 							pos_x = 0;
 						}
@@ -117,11 +115,8 @@ int Ship::place_ship(enum command_e cmd) {
 						this->rotation = UP;
 						break;
 				}
-				break;
-			case PLACE:
-				this->isPlaced = true;
-				break;
-		}
+			break;
+		default: break;
 	}
 	return 0;
 }
@@ -152,4 +147,50 @@ int Ship::get_id() {
 
 void Ship::set_id(int id) {
 	this->id = (char)id;
+}
+
+void Ship::set_placed(bool state) {
+	this->isPlaced = state;
+}
+
+bool Ship::evaluate_pos(int x, int y, int len, enum rotation_e rotate) {
+	bool evaluate = true;
+	
+	if (rotate == UP) {
+		if (y - len < 0) {
+			evaluate = false;
+		}
+	}
+
+	if (rotate == RIGHT) {
+		if (x + len >= BOARD_SIZE) {
+			evaluate = false;
+		}
+	}
+
+	if (rotate == DOWN) {
+		if (y + len >= BOARD_SIZE) {
+			evaluate = false;
+		}
+	}
+
+	if (rotate == LEFT) {
+		if (x - len < 0) {
+			evaluate = false;
+		}
+	}
+
+	return evaluate;
+}
+
+void Ship::setX(int x) {
+	this->pos_x = x;
+}
+
+void Ship::setY(int y) {
+	this->pos_y = y;
+}
+
+void Ship::setRotation(enum rotation_e r) {
+	this->rotation = r;
 }

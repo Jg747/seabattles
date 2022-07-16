@@ -4,7 +4,7 @@
 int main(int argc, char *argv[]) {
 	START_DEBUG()
 	Gui g;
-	g.start();
+	while (g.start());
 	STOP_DEBUG()
     return 0;
 }

@@ -3,7 +3,7 @@
 
 #define BOARD_SIZE 10
 #define SHIPS_COUNT 5
-#define DAMAGE 100
+#define DAMAGE 0xFFFFFF
 
 extern const int ships_len[];
 
@@ -27,13 +27,29 @@ enum rotation_e {
 	LEFT = 0x03
 };
 
+enum action_e {
+	PLACE_SHIPS,
+	PLACE_A_SHIP,
+	ALLY,
+	ATTACK,
+	FORFEIT
+};
+
 enum command_e {
 	MOVE_UP,
 	MOVE_RIGHT,
 	MOVE_DOWN,
 	MOVE_LEFT,
 	ROTATE,
-	PLACE
+	PLACE,
+	REMOVE
+};
+
+enum game_status_e {
+	WIN,
+	LOSE,
+	PROGRESS,
+	QUITTING
 };
 
 #endif

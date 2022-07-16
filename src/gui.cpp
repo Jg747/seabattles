@@ -4,6 +4,7 @@
 
 #include <string>
 #include <cmath>
+#include <unistd.h>
 
 using std::to_string;
 
@@ -16,7 +17,12 @@ Gui::~Gui() {
 	endwin();
 	del_array_win(game_wrapper, 2);
 	del_array_win(start_menu, 2);
-	del_array_win(my_grid, 2);
+	delwin(sea_border);
+	for (int i = 0; i < BOARD_SIZE + 1; i++) {
+		for (int j = 0; j < BOARD_SIZE + 1; j++) {
+			delwin(sea[i][j]);
+		}
+	}
 }
 
 void Gui::del_array_win(WINDOW* array[], int len) {
@@ -34,8 +40,10 @@ void Gui::init_gui() {
 	init_pair((short)COLOR_SHIP, COLOR_WHITE, COLOR_WHITE);
 	init_pair((short)COLOR_BLUE_TILE, COLOR_BLUE, COLOR_BLUE);
 	init_pair((short)COLOR_AQUA_TILE, COLOR_CYAN, COLOR_CYAN);
+	init_pair((short)COLOR_HIT, COLOR_RED, COLOR_RED);
 
 	curs_set(0);
+	noecho();
 
 	//Borders
 	game_wrapper[1] = newwin(LINES, COLS, 0, 0);
@@ -62,21 +70,23 @@ void Gui::init_game_windows() {
 	int col = COLS * PERCENT_SEA / 100;
 	int line = LINES - 3;
 
-	my_grid[1] = newwin(line, col + 1, 2, 1);
-	box(my_grid[1], ACS_VLINE, ACS_HLINE);
+	sea_border = newwin(line, col + 1, 2, 1);
+	box(sea_border, ACS_VLINE, ACS_HLINE);
 
-	my_grid[0] = newwin(line - 2, col - 1, 3, 2);
-
-	wrefresh(my_grid[1]);
-	wrefresh(my_grid[0]);
+	wrefresh(sea_border);
 
 	// SEA
 	init_sea();
 
-	actions_border = newwin(line, (COLS * (100 - PERCENT_SEA) / 100) - 3 + (COLS - 2 - (col + 1 + (COLS * (100 - PERCENT_SEA) / 100) - 3)), 2, 2 + col);
-	box(actions_border, ACS_VLINE, ACS_HLINE);
+	actions[1] = newwin(line, (COLS * (100 - PERCENT_SEA) / 100) - 3 + (COLS - 2 - (col + 1 + (COLS * (100 - PERCENT_SEA) / 100) - 3)), 2, 2 + col);
+	box(actions[1], ACS_VLINE, ACS_HLINE);
 
-	wrefresh(actions_border);
+	int max_lines, max_cols;
+	get_win_size(actions[1], max_cols, max_lines);
+	actions[0] = newwin(max_lines - 2, max_cols - 2, 3, 3 + col);
+
+	wrefresh(actions[1]);
+	wrefresh(actions[0]);
 }
 
 void Gui::init_sea() {
@@ -148,35 +158,34 @@ void Gui::get_win_size(WINDOW *w, int &width, int &height) {
 }
 
 int Gui::game_menu() {
-
 	int x, y;
 	get_win_size(start_menu[0], x, y);
 	wclear(start_menu[0]);
 	mvwrite_on_window(start_menu[0], x/2 - 2, y/2 - 4, "MENU");
 	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Singleplayer");
 	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Multiplayer");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2, "  Exit");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 + 1, "  Exit");
 	wrefresh(start_menu[0]);
 
-	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 3, ">");
+	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 3, ">", true);
 }
 
-int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol) {
-	keypad(w, TRUE);
-
+int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool step_last) {
 	string space;
-	for (char c : symbol) {
+	for (int i = 0; symbol[i]; i++) {
 		space.push_back(' ');
 	}
 
 	int ch = 0, select = 0;
 	while (ch != '\n') {
+		keypad(w, TRUE);
 		ch = wgetch(w);
+		keypad(w, FALSE);
 		switch (ch) {
 			case KEY_UP:
 				if (select > 0) {
 					mvwrite_on_window(w, x, y + select - 1, symbol);
-					mvwrite_on_window(w, x, y + select, space);
+					mvwrite_on_window(w, x, y + select + (step_last && select == noptions - 1 ? 1 : 0), space);
 					wrefresh(w);
 					select--;
 				}
@@ -184,7 +193,7 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol) {
 			case KEY_DOWN:
 				if (select < noptions - 1) {
 					mvwrite_on_window(w, x, y + select, space);
-					mvwrite_on_window(w, x, y + select + 1, symbol);
+					mvwrite_on_window(w, x, y + select + (step_last && select == noptions - 2 ? 1 : 0) + 1, symbol);
 					wrefresh(w);
 					select++;
 				}
@@ -193,50 +202,277 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol) {
 		}
 	}
 
-	keypad(w, FALSE);
-
 	return select;
 }
 
-void Gui::paint_sea() {
+void Gui::paint_sea(bool my_sea) {
 	int height, width;
 	get_win_size(sea[0][0], width, height);
 
-	bool blue = true;
-	for (int i = 1; i < BOARD_SIZE + 1; i++) {
-		for (int j = 1; j < BOARD_SIZE + 1; j++) {
+	bool blue = false;
+	int i, j;
+	for (i = 1; i < BOARD_SIZE + 1; i++) {
+		for (j = 1; j < BOARD_SIZE + 1; j++) {
 			if (height > 1) {
 				box(sea[i][j], ACS_VLINE, ACS_HLINE);
 			}
-			if (blue) {
-				wbkgd(sea[i][j], COLOR_PAIR(COLOR_BLUE_TILE));
+			if (my_sea ? m->board[i-1][j-1] != 0 : m->enemy_board[i-1][j-1] != 0) {
+				wbkgd(sea[i][j], COLOR_PAIR(COLOR_SHIP));
+				blue = !blue;
 			} else {
-				wbkgd(sea[i][j], COLOR_PAIR(COLOR_AQUA_TILE));
+				if (blue) {
+					wbkgd(sea[i][j], COLOR_PAIR(COLOR_BLUE_TILE));
+				} else {
+					wbkgd(sea[i][j], COLOR_PAIR(COLOR_AQUA_TILE));
+				}
+				blue = !blue;
 			}
-			blue = !blue;
+			wrefresh(sea[i][j]);
 		}
 		blue = !blue;
 	}
 }
 
-void Gui::place_ships() {
-	//paint_grid()
-	wrefresh(my_grid[0]);
+void Gui::paint_actions_menu(enum action_e a, int &width, int &height) {
+	get_win_size(actions[0], width, height);
+
+	wclear(actions[0]);
+
+	switch (a) {
+		case PLACE_SHIPS:
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 - 4, "SHIP PLACEMENT");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 - 2, "> Carrier");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 - 1, "  Battleship");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2, "  Destroyer");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 + 1, "  Submarine");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 + 2, "  Patrol boat");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 + 3, "  Confirm");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 + 5, "  Quit");
+			width = width/2 - 7;
+			height = height/2 - 2;
+			break;
+		case PLACE_A_SHIP:
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 - 2, "SHIP PLACEMENT");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2, "Arrow keys to move");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 + 1, "R to rotate");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 + 2, "ENTER to place");
+			mvwrite_on_window(actions[0], width/2 - 7, height/2 + 3, "C to change ship");
+			width = width/2 - 7;
+			height = height/2 - 1;
+			break;
+		case ATTACK:
+			break;
+		case FORFEIT:
+			break;
+		case ALLY:
+			// Implementation only in multiplayer
+			break;
+	}
 }
 
-void Gui::start() {
-	int choice = game_menu();
+int Gui::actions_menu(enum action_e a) {
+	int x, y;
+	
+	paint_actions_menu(a, x, y);
 
-	if (choice == 2) {
-		return;
+	switch (a) {
+		case PLACE_SHIPS:
+			return menu_cursor(actions[0], x, y, 7, ">", true);
+			break;
+		case PLACE_A_SHIP:
+			return 0;
+			break;
+		case ATTACK:
+			break;
+		case FORFEIT:
+			break;
+		case ALLY:
+			// Implementation only in multiplayer
+			break;
 	}
 
-	choice = 0;
+	return 0;
+}
 
+void Gui::color_tile(int i, int j, enum colors color) {
+	wbkgd(sea[i+1][j+1], COLOR_PAIR(color));
+	wrefresh(sea[i+1][j+1]);
+}
+
+void Gui::paint_ship(int index, Ship *&ship, bool my_sea) {
+	int x = ship->getX();
+	int y = ship->getY();
+	enum rotation_e rotate = ship->getRotation();
+	int len = ship->getLen();
+	enum colors color;
+
+	if (!m->check_intersection(ship, true)) {
+		color = COLOR_HIT;
+	} else {
+		color = COLOR_SHIP;
+	}
+
+	paint_sea(my_sea);
+
+	switch (rotate) {
+		case UP:
+			for (int i = y; i > y - len; i--) {
+				color_tile(i, x, color);
+			}
+			break;
+		case RIGHT:
+			for (int i = x; i < x + len; i++) {
+				color_tile(y, i, color);
+			}
+			break;
+		case DOWN:
+			for (int i = y; i < y + len; i++) {
+				color_tile(i, x, color);
+			}
+			break;
+		case LEFT:
+			for (int i = x; i > x - len; i--) {
+				color_tile(y, i, color);
+			}
+			break;
+	}
+}
+
+int Gui::place_a_ship(int index) {
+	actions_menu(PLACE_A_SHIP);
+	wmove(actions[0], 0, 0);
+	int width, height;
+	get_win_size(actions[0], width, height);
+
+	if (m->ships[index]->is_placed()) {
+		m->insert_ship(index, REMOVE);
+	}
+
+	paint_ship(index, m->ships[index], true);
+	int ch = 0;
+	while (ch != '\n') {
+		keypad(actions[0], TRUE);
+		ch = wgetch(actions[0]);
+		keypad(actions[0], FALSE);
+		switch (ch) {
+			case KEY_UP:
+				m->insert_ship(index, MOVE_UP);
+				paint_ship(index, m->ships[index], true);
+				break;
+			case KEY_RIGHT:
+				m->insert_ship(index, MOVE_RIGHT);
+				paint_ship(index, m->ships[index], true);
+				break;
+			case KEY_DOWN:
+				m->insert_ship(index, MOVE_DOWN);
+				paint_ship(index, m->ships[index], true);
+				break;
+			case KEY_LEFT:
+				m->insert_ship(index, MOVE_LEFT);
+				paint_ship(index, m->ships[index], true);
+				break;
+			case 'r':
+				m->insert_ship(index, ROTATE);
+				paint_ship(index, m->ships[index], true);
+				break;
+			case 'c':
+				return -1;
+				break;
+		}
+	}
+
+	ch = m->insert_ship(index, PLACE);
+	if (ch) {
+		paint_ship(index, m->ships[index], true);
+	}
+
+	return ch;
+}
+
+bool Gui::place_ships() {
+	bool confirm = false;
+	int choice, width, height, exit;
+
+	get_win_size(actions[0], width, height);
+
+	while (!confirm) {
+		choice = actions_menu(PLACE_SHIPS);
+		if (choice == 5) {
+			if (m->remaining_ships() < SHIPS_COUNT) {
+				mvwrite_on_window(actions[0], width/2 - 7, height/2 + 7, "[Must place all ships!]");
+				wrefresh(actions[0]);
+				sleep(2);
+				mvwrite_on_window(actions[0], width/2 - 7, height/2 + 6, "                       ");
+				wrefresh(actions[0]);
+			} else {
+				confirm = true;
+			}
+		} else if (choice == 6) {
+			return false;
+		} else {
+			exit = 0;
+			while (exit == 0) {
+				exit = place_a_ship(choice);
+				paint_sea(true);
+			}
+		}
+	}
+	return true;
+}
+
+enum game_status_e make_actions() {
+	enum game_status_e status = PROGRESS;
+
+	
+
+	return status;
+}
+
+bool Gui::start() {
+	box(start_menu[1], ACS_VLINE, ACS_HLINE);
+	wrefresh(start_menu[1]);
+	wrefresh(start_menu[0]);
+
+	int choice = game_menu();
+	if (choice == 2) {
+		return false;
+	}
+	choice = 0;
 	init_game_windows();
 	
 	m = new Match((enum gamemode)choice);
-	
-	getch();
+	m->generate_match();
+	if (!place_ships()) {
+		return true;
+	}
+
+	while (status == PROGRESS) {
+		status = make_actions();
+		if (status == PROGRESS) {
+			m->ai_attack();
+		}
+	}
+
+	if (status != QUITTING) {
+		box(start_menu[1], ACS_VLINE, ACS_HLINE);
+		wrefresh(start_menu[1]);
+		wrefresh(start_menu[0]);
+		int width, height;
+		get_win_size(start_menu[0], width, height);
+		if (status == WIN) {
+			mvwrite_on_window(start_menu[0], width/2 - 3, height/2 - 3, "YOU WON!");
+		} else if (status == LOSE) {
+			mvwrite_on_window(start_menu[0], width/2 - 3, height/2 - 3, "YOU LOST!");
+		}
+		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 - 1, "Total shots: ");
+		mvwrite_on_window(start_menu[0], width/2 - 5, height/2, "Shots missed: ");
+		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 + 1, "Hits: ");
+		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 + 2, "Match time: ");
+		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 + 3, "Grade: ");
+		mvwrite_on_window(start_menu[0], width/2 - 13, height/2 + 5, "[press any key to continue]");
+		getch();
+	}
+
+	return true;
 }
 

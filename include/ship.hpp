@@ -30,6 +30,12 @@ class Ship {
 		enum rotation_e getRotation();
 		int get_id();
 		void set_id(int id);
+		void set_placed(bool state);
+		void setX(int x);
+		void setY(int y);
+		void setRotation(enum rotation_e r);
+
+		static bool evaluate_pos(int x, int y, int len, enum rotation_e rotate);
 };
 
 #endif
