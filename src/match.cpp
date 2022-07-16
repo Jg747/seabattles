@@ -1,6 +1,6 @@
-#include <match.h>
-#include <common.h>
-#include <ship.h>
+#include <match.hpp>
+#include <common.hpp>
+#include <ship.hpp>
 
 #include <iostream>
 

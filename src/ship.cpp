@@ -1,5 +1,5 @@
-#include <ship.h>
-#include <common.h>
+#include <ship.hpp>
+#include <common.hpp>
 
 const int ships_len[] = {5, 4, 3, 3, 2};
 

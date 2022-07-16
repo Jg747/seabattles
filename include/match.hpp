@@ -1,8 +1,8 @@
 #ifndef __match_h__
 #define __match_h__
 
-#include <common.h>
-#include <ship.h>
+#include <common.hpp>
+#include <ship.hpp>
 
 class Match {
 	public:

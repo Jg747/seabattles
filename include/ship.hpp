@@ -1,7 +1,7 @@
 #ifndef __ship_h__
 #define __ship_h__
 
-#include <common.h>
+#include <common.hpp>
 
 #include <string>
 
