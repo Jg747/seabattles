@@ -2,7 +2,10 @@
 #define __common_h__
 
 #define BOARD_SIZE 10
+
 #define SHIPS_COUNT 5
+#define SHOTS_TO_WIN 5 + 4 + 3 + 3 + 1
+
 #define DAMAGE 0xFFFFFF
 
 extern const int ships_len[];
@@ -30,6 +33,8 @@ enum rotation_e {
 enum action_e {
 	PLACE_SHIPS,
 	PLACE_A_SHIP,
+	GAME,
+	SEE_FIELD,
 	ALLY,
 	ATTACK,
 	FORFEIT
@@ -49,7 +54,8 @@ enum game_status_e {
 	WIN,
 	LOSE,
 	PROGRESS,
-	QUITTING
+	QUITTING,
+	NO_ATK
 };
 
 #endif

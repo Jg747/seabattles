@@ -23,6 +23,7 @@ class Match {
 		Ship *enemy[SHIPS_COUNT];
 
 		// Stats
+		int ai_hits; 			// Needed to check if end match
 		int missed_shots;
 		int hit_shots;
 		// player eliminations
@@ -55,6 +56,7 @@ class Match {
 		bool insert_on_board(Ship *&ship, bool my_board);
 		void remove_from_board(Ship *&ship);
 		void assign_ids();
+		bool is_hit(int x, int y);
 };
 
 #endif

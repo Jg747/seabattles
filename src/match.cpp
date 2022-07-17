@@ -21,6 +21,7 @@ Match::Match(enum gamemode mode) {
 	assign_ids();
 	this->missed_shots = 0;
 	this->hit_shots = 0;
+	this->ai_hits = 0;
 }
 
 Match::~Match() {
@@ -267,6 +268,24 @@ void Match::generate_match() {
 	}
 }
 
+bool Match::is_hit(int x, int y) {
+	return board[y][x] >= DAMAGE;
+}
+
 void Match::ai_attack() {
-	
+	srand(time(NULL));
+
+	int rand_x;
+	int rand_y;
+
+	do {
+		rand_x = rand() % BOARD_SIZE;
+		rand_y = rand() % BOARD_SIZE;
+	} while (is_hit(rand_x, rand_y));
+
+	board[rand_y][rand_x] += DAMAGE;
+
+	if (board[rand_y][rand_x] > DAMAGE) {
+		ai_hits++;
+	}
 }

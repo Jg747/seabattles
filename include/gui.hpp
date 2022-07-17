@@ -54,6 +54,7 @@ class Gui {
 		bool place_ships();
 		int place_a_ship(int index);
 		enum game_status_e make_actions();
+		int attack();
 
 		void get_win_size(WINDOW *w, int &width, int &height);
 		void write_on_window(WINDOW *w, string str);
