@@ -10,7 +10,7 @@ using std::to_string;
 
 Gui::Gui() {
 	init_gui();
-	this->status = PROGRESS;
+	this->m = NULL;
 }
 
 Gui::~Gui() {
@@ -108,7 +108,7 @@ void Gui::init_sea() {
 
 	y = 3 + y_off;
 
-	char col_name[] = "A";
+	char col_name = 'A';
 	int row_name = 1;
 	bool blue = true;
 
@@ -128,8 +128,8 @@ void Gui::init_sea() {
 				blue = !blue;
 			} else if (i == 0) {
 				if (j != 0) {
-					mvwrite_on_window(sea[i][j], x_inc/2, y_inc/2, string(col_name));
-					col_name[0]++;
+					mvwrite_on_window(sea[i][j], x_inc/2, y_inc/2, string(1, col_name));
+					col_name++;
 				}
 			} else if (j == 0) {
 				mvwrite_on_window(sea[i][j], x_inc/2, y_inc/2, to_string(row_name));
@@ -451,7 +451,7 @@ bool Gui::place_ships() {
 	while (!confirm) {
 		choice = actions_menu(PLACE_SHIPS);
 		if (choice == 5) {
-			if (/*m->remaining_ships() < SHIPS_COUNT*/false) {
+			if (m->remaining_ships() < SHIPS_COUNT) {
 				mvwrite_on_window(actions[0], width/2 - 7, height/2 + 7, "[Must place all ships!]");
 				wrefresh(actions[0]);
 				sleep(2);
@@ -475,6 +475,16 @@ bool Gui::place_ships() {
 	return true;
 }
 
+void Gui::paint_attack(int x, int y) {
+	if (m->enemy_board[y][x] > DAMAGE) {
+		color_tile(y, x, COLOR_NOT_HIT);
+	} else if (m->enemy_board[y][x] == DAMAGE) {
+		color_tile(y, x, COLOR_HIT);
+	} else {
+		color_tile(y, x, COLOR_SELECT_HIT);
+	}
+}
+
 int Gui::attack() {
 	// Arrows - ENTER - q (esci dall'attacco)
 	actions_menu(ATTACK);
@@ -484,6 +494,7 @@ int Gui::attack() {
 	paint_sea(false);
 	color_tile(y, x, COLOR_SELECT_HIT);
 
+	retry:
 	int ch = 0;
 	while (ch != '\n') {
 		keypad(actions[0], TRUE);
@@ -494,44 +505,28 @@ int Gui::attack() {
 				if (y - 1 >= 0) {
 					y--;
 					paint_sea(false);
-					if (m->enemy_board[y][x] >= DAMAGE) {
-						color_tile(y, x, COLOR_HIT);
-					} else {
-						color_tile(y, x, COLOR_SELECT_HIT);
-					}
+					paint_attack(x, y);
 				}
 				break;
 			case KEY_RIGHT:
 				if (x + 1 < BOARD_SIZE) {
 					x++;
 					paint_sea(false);
-					if (m->enemy_board[y][x] >= DAMAGE) {
-						color_tile(y, x, COLOR_HIT);
-					} else {
-						color_tile(y, x, COLOR_SELECT_HIT);
-					}
+					paint_attack(x, y);
 				}
 				break;
 			case KEY_DOWN:
 				if (y + 1 < BOARD_SIZE) {
 					y++;
 					paint_sea(false);
-					if (m->enemy_board[y][x] >= DAMAGE) {
-						color_tile(y, x, COLOR_HIT);
-					} else {
-						color_tile(y, x, COLOR_SELECT_HIT);
-					}
+					paint_attack(x, y);
 				}
 				break;
 			case KEY_LEFT:
 				if (x - 1 >= 0) {
 					x--;
 					paint_sea(false);
-					if (m->enemy_board[y][x] >= DAMAGE) {
-						color_tile(y, x, COLOR_HIT);
-					} else {
-						color_tile(y, x, COLOR_SELECT_HIT);
-					}
+					paint_attack(x, y);
 				}
 				break;
 			case 'q':
@@ -540,7 +535,16 @@ int Gui::attack() {
 		}
 	}
 
+	if (m->enemy_board[y][x] >= DAMAGE) {
+		goto retry;
+	}
+	
 	m->enemy_board[y][x] += DAMAGE;
+	if (m->enemy_board[y][x] > DAMAGE) {
+		m->hit_shots++;
+	} else {
+		m->missed_shots++;
+	}
 
 	return 0;
 }
@@ -566,8 +570,52 @@ enum game_status_e Gui::make_actions() {
 			}
 			break;
 	}
-	paint_sea(true);
 	return PROGRESS;
+}
+
+bool Gui::singleplayer() {
+	Match::set_time(m->start_time);
+
+	m->generate_match();
+	if (!place_ships()) {
+		return true;
+	}
+
+	while (m->status == PROGRESS || m->status == NO_ATK) {
+		paint_sea(true);
+		m->status = make_actions();
+		if (m->status == PROGRESS) {
+			//sleep(1);
+			m->ai_attack();
+			if (m->ai_hits == SHOTS_TO_WIN) {
+				m->status = LOSE;
+			}
+		}
+	}
+
+	Match::set_time(m->end_time);
+
+	if (m->status != QUITTING) {
+		box(start_menu[1], ACS_VLINE, ACS_HLINE);
+		int width, height;
+		get_win_size(start_menu[0], width, height);
+		if (m->status == WIN) {
+			mvwrite_on_window(start_menu[0], width/2 - 3, height/2 - 3, "YOU WON!");
+		} else if (m->status == LOSE) {
+			mvwrite_on_window(start_menu[0], width/2 - 3, height/2 - 3, "YOU LOST!");
+		}
+		mvwrite_on_window(start_menu[0], width/2 - 8, height/2 - 1, "Total shots: " + to_string((m->hit_shots + m->missed_shots)));
+		mvwrite_on_window(start_menu[0], width/2 - 8, height/2, "Shots missed: " + to_string(m->missed_shots));
+		mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 1, "Hits: " + to_string(m->hit_shots));
+		mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 2, "Match time [" + m->get_duration() + "]");
+		mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 3, "Grade: " + string(1, m->get_grade()));
+		mvwrite_on_window(start_menu[0], width/2 - 13, height/2 + 5, "[press any key to continue]");
+		wrefresh(start_menu[1]);
+		wrefresh(start_menu[0]);
+		getch();
+	}
+
+	return true;
 }
 
 bool Gui::start() {
@@ -582,42 +630,20 @@ bool Gui::start() {
 	choice = 0;
 	init_game_windows();
 	
-	m = new Match((enum gamemode)choice);
-	m->generate_match();
-	if (!place_ships()) {
-		return true;
+	if (m == NULL) {
+		m = new Match((enum gamemode)choice);
+	} else {
+		m->reset((enum gamemode)choice);
 	}
 
-	while (status == PROGRESS || status == NO_ATK) {
-		status = make_actions();
-		if (status == PROGRESS) {
-			m->ai_attack();
-			if (m->ai_hits == SHOTS_TO_WIN) {
-				status = LOSE;
-			}
-		}
-	}
-
-	if (status != QUITTING) {
-		box(start_menu[1], ACS_VLINE, ACS_HLINE);
-		wrefresh(start_menu[1]);
-		wrefresh(start_menu[0]);
-		int width, height;
-		get_win_size(start_menu[0], width, height);
-		if (status == WIN) {
-			mvwrite_on_window(start_menu[0], width/2 - 3, height/2 - 3, "YOU WON!");
-		} else if (status == LOSE) {
-			mvwrite_on_window(start_menu[0], width/2 - 3, height/2 - 3, "YOU LOST!");
-		}
-		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 - 1, "Total shots: ");
-		mvwrite_on_window(start_menu[0], width/2 - 5, height/2, "Shots missed: ");
-		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 + 1, "Hits: ");
-		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 + 2, "Match time: ");
-		mvwrite_on_window(start_menu[0], width/2 - 5, height/2 + 3, "Grade: ");
-		mvwrite_on_window(start_menu[0], width/2 - 13, height/2 + 5, "[press any key to continue]");
-		getch();
+	switch (choice) {
+		case SINGLEPLAYER:
+			return singleplayer();
+			break;
+		case MULTYPLAYER:
+			// TO-DO
+			break;
 	}
 
 	return true;
 }
-

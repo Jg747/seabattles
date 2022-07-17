@@ -42,12 +42,12 @@ class Gui {
 
 		Match *m;
 
-		enum game_status_e status;
-
 		void del_array_win(WINDOW *array[], int len);
 		void init_gui();
 		void init_game_windows();
 		void init_sea();
+
+		bool singleplayer();
 
 		int game_menu();
 		int actions_menu(enum action_e a);
@@ -66,6 +66,7 @@ class Gui {
 		void paint_actions_menu(enum action_e a, int &width, int &height);
 		void paint_ship(int index, Ship *&ship, bool my_sea);
 		void color_tile(int i, int j, enum colors color);
+		void paint_attack(int x, int y);
 };
 
 #endif

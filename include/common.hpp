@@ -4,7 +4,7 @@
 #define BOARD_SIZE 10
 
 #define SHIPS_COUNT 5
-#define SHOTS_TO_WIN 5 + 4 + 3 + 3 + 1
+#define SHOTS_TO_WIN 5 + 4 + 3 + 3 + 2
 
 #define DAMAGE 0xFFFFFF
 
@@ -54,8 +54,17 @@ enum game_status_e {
 	WIN,
 	LOSE,
 	PROGRESS,
+	WAITING,
 	QUITTING,
 	NO_ATK
+};
+
+enum grade_e {
+	S = 'S',
+	A = 'A',
+	B = 'B',
+	C = 'C',
+	D = 'D'
 };
 
 #endif

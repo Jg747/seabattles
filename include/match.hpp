@@ -4,10 +4,16 @@
 #include <common.hpp>
 #include <ship.hpp>
 
+#include <chrono>
+
 class Match {
 	public:
 		Match(enum gamemode mode);
 		~Match();
+		void reset(enum gamemode g);
+		static void set_time(time_t &time);
+		string get_duration();
+		enum grade_e get_grade();
 		
 		bool insert_ship(int index, enum command_e cmd);
 		int remaining_ships();
@@ -23,29 +29,14 @@ class Match {
 		Ship *enemy[SHIPS_COUNT];
 
 		// Stats
-		int ai_hits; 			// Needed to check if end match
+		enum game_status_e status;
+		int ai_hits; 				// Needed to check if end match
 		int missed_shots;
 		int hit_shots;
-		// player eliminations
-		// Match start time
-		/*
-		#include <iostream>
-		#include <chrono>
-		#include <ctime>    
-
-		int main() {
-			auto start = std::chrono::system_clock::now();
-			// Some computation here
-			auto end = std::chrono::system_clock::now();
+		time_t start_time;
+		time_t end_time;
 		
-			std::chrono::duration<double> elapsed_seconds = end-start;
-			std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-		
-			std::cout << "finished computation at " << std::ctime(&end_time)
-					<< "elapsed time: " << elapsed_seconds.count() << "s" << 
-					<< std::endl;
-		}
-		*/
+		int player_eliminations;	// Multiplayer only
 		
 	private:
 		enum gamemode mode;

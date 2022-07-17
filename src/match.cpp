@@ -6,27 +6,39 @@
 #include <iostream>
 #include <time.h>
 #include <stdlib.h>
+#include <chrono>
 
 using std::cout;
 using std::cin;
+using std::to_string;
 
 Match::Match(enum gamemode mode) {
 	this->mode = mode;
-	this->last_id = 1;
-	reset_board();
 	for (int i = 0; i < SHIPS_COUNT; i++) {
 		ships[i] = new Ship(i);
 		enemy[i] = new Ship(i);
 	}
-	assign_ids();
-	this->missed_shots = 0;
-	this->hit_shots = 0;
-	this->ai_hits = 0;
+	reset(mode);
 }
 
 Match::~Match() {
 	for (int i = 0; i < SHIPS_COUNT; i++) {
 		delete ships[i];
+	}
+}
+
+void Match::reset(enum gamemode g) {
+	this->mode = g;
+	this->status = PROGRESS;
+	this->last_id = 1;
+	this->missed_shots = 0;
+	this->hit_shots = 0;
+	this->ai_hits = 0;
+	reset_board();
+	assign_ids();
+	for (int i = 0; i < SHIPS_COUNT; i++) {
+		ships[i]->setX(0);
+		ships[i]->setY(BOARD_SIZE - 1);
 	}
 }
 
@@ -200,25 +212,30 @@ bool Match::insert_on_board(Ship *&ship, bool my_board) {
 }
 
 void Match::remove_from_board(Ship *&ship) {
-	switch (ship->getRotation()) {
+	enum rotation_e rotation = ship->getRotation();
+	int x = ship->getX();
+	int y = ship->getY();
+	int len = ship->getLen();
+
+	switch (rotation) {
 		case UP:
-			for (int i = ship->getY(); i > ship->getY() - ship->getLen(); i--) {
-				board[i][ship->getX()] = 0;
+			for (int i = y; i > y - len; i--) {
+				board[i][x] = 0;
 			}
 			break;
 		case RIGHT:
-			for (int i = ship->getX(); i < ship->getY() + ship->getLen(); i++) {
-				board[ship->getY()][i] = 0;
+			for (int i = x; i < x + len; i++) {
+				board[y][i] = 0;
 			}
 			break;
 		case DOWN:
-			for (int i = ship->getY(); i < ship->getY() + ship->getLen(); i++) {
-				board[i][ship->getX()] = 0;
+			for (int i = y; i < y + len; i++) {
+				board[i][x] = 0;
 			}
 			break;
 		case LEFT:
-			for (int i = ship->getX(); i > ship->getY() - ship->getLen(); i--) {
-				board[ship->getY()][i] = 0;
+			for (int i = x; i > x - ship->getLen(); i--) {
+				board[y][i] = 0;
 			}
 			break;
 	}
@@ -288,4 +305,38 @@ void Match::ai_attack() {
 	if (board[rand_y][rand_x] > DAMAGE) {
 		ai_hits++;
 	}
+}
+
+void Match::set_time(time_t &time) {
+	time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+}
+
+string Match::get_duration() {
+	std::chrono::time_point<std::chrono::system_clock> s = std::chrono::system_clock::from_time_t(start_time);
+	std::chrono::time_point<std::chrono::system_clock> e = std::chrono::system_clock::from_time_t(end_time);
+	std::chrono::duration<double> difference = e - s;
+	long seconds = difference.count();
+	int min = seconds / 60;
+	seconds = seconds % 60;
+	return to_string(min) + " : " + to_string(seconds);
+}
+
+enum grade_e Match::get_grade() {
+	enum grade_e grade = S;
+
+	int hit_perc = hit_shots * 100 / (hit_shots + missed_shots);
+
+	if (hit_perc >= 90) {
+		grade = S;
+	} else if (hit_perc >= 70) {
+		grade = A;
+	} else if (hit_perc >= 50) {
+		grade = B;
+	} else if (hit_perc >= 25) {
+		grade = C;
+	} else {
+		grade = D;
+	}
+
+	return grade;
 }
