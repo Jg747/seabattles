@@ -18,10 +18,13 @@ Gui::~Gui() {
 	endwin();
 	del_array_win(game_wrapper, 2);
 	del_array_win(start_menu, 2);
-	delwin(sea_border);
-	for (int i = 0; i < BOARD_SIZE + 1; i++) {
-		for (int j = 0; j < BOARD_SIZE + 1; j++) {
-			delwin(sea[i][j]);
+	if (this->m != NULL) {
+		delete m;
+		delwin(sea_border);
+		for (int i = 0; i < BOARD_SIZE + 1; i++) {
+			for (int j = 0; j < BOARD_SIZE + 1; j++) {
+				delwin(sea[i][j]);
+			}
 		}
 	}
 }
@@ -41,8 +44,8 @@ void Gui::init_gui() {
 	init_pair((short)COLOR_SHIP, COLOR_WHITE, COLOR_WHITE);
 	init_pair((short)COLOR_BLUE_TILE, COLOR_BLUE, COLOR_BLUE);
 	init_pair((short)COLOR_AQUA_TILE, COLOR_CYAN, COLOR_CYAN);
-	init_pair((short)COLOR_HIT, COLOR_RED, COLOR_RED);
-	init_pair((short)COLOR_NOT_HIT, COLOR_YELLOW, COLOR_YELLOW);
+	init_pair((short)COLOR_NOT_HIT, COLOR_RED, COLOR_RED);
+	init_pair((short)COLOR_HIT, COLOR_YELLOW, COLOR_YELLOW);
 	init_pair((short)COLOR_SELECT_PLACE, COLOR_GREEN, COLOR_GREEN);
 	init_pair((short)COLOR_SELECT_HIT, COLOR_MAGENTA, COLOR_MAGENTA);
 
@@ -214,7 +217,7 @@ void Gui::paint_sea(bool my_sea) {
 	get_win_size(sea[0][0], width, height);
 
 	bool blue = false;
-	int i, j;
+	int i, j, k;
 	for (i = 1; i < BOARD_SIZE + 1; i++) {
 		for (j = 1; j < BOARD_SIZE + 1; j++) {
 			if (height > 1) {
@@ -224,7 +227,16 @@ void Gui::paint_sea(bool my_sea) {
 				if (m->board[i-1][j-1] == DAMAGE) {
 					wbkgd(sea[i][j], COLOR_PAIR(COLOR_NOT_HIT));
 				} else if (m->board[i-1][j-1] > DAMAGE) {
-					wbkgd(sea[i][j], COLOR_PAIR(COLOR_HIT));
+					for (k = 0; k < SHIPS_COUNT; k++) {
+						if (m->ships[k]->point_intersect(j-1, i-1)) {
+							break;
+						}
+					}
+					if (m->ships[k]->is_sunk()) {
+						wbkgd(sea[i][j], COLOR_PAIR(COLOR_SELECT_PLACE));
+					} else {
+						wbkgd(sea[i][j], COLOR_PAIR(COLOR_HIT));
+					}
 				} else {
 					wbkgd(sea[i][j], COLOR_PAIR(COLOR_SHIP));
 				}
@@ -232,7 +244,16 @@ void Gui::paint_sea(bool my_sea) {
 				if (m->enemy_board[i-1][j-1] == DAMAGE) {
 					wbkgd(sea[i][j], COLOR_PAIR(COLOR_NOT_HIT));
 				} else if (m->enemy_board[i-1][j-1] > DAMAGE) {
-					wbkgd(sea[i][j], COLOR_PAIR(COLOR_HIT));
+					for (k = 0; k < SHIPS_COUNT; k++) {
+						if (m->enemy[k]->point_intersect(j-1, i-1)) {
+							break;
+						}
+					}
+					if (m->enemy[k]->is_sunk()) {
+						wbkgd(sea[i][j], COLOR_PAIR(COLOR_SELECT_PLACE));
+					} else {
+						wbkgd(sea[i][j], COLOR_PAIR(COLOR_HIT));
+					}
 				} else {
 					wbkgd(sea[i][j], COLOR_PAIR(COLOR_SHIP));
 				}
@@ -361,7 +382,7 @@ void Gui::paint_ship(int index, Ship *&ship, bool my_sea) {
 	if (ship->is_placed()) {
 		color = COLOR_SHIP;
 	} else if (!m->check_intersection(ship, true)) {
-		color = COLOR_HIT;
+		color = COLOR_NOT_HIT;
 	} else {
 		color = COLOR_SELECT_PLACE;
 	}
@@ -486,7 +507,6 @@ void Gui::paint_attack(int x, int y) {
 }
 
 int Gui::attack() {
-	// Arrows - ENTER - q (esci dall'attacco)
 	actions_menu(ATTACK);
 	int x = 0;
 	int y = 0;
@@ -542,6 +562,12 @@ int Gui::attack() {
 	m->enemy_board[y][x] += DAMAGE;
 	if (m->enemy_board[y][x] > DAMAGE) {
 		m->hit_shots++;
+		for (int i = 0; i < SHIPS_COUNT; i++) {
+			if (m->enemy[i]->point_intersect(x, y)) {
+				m->enemy[i]->add_hit();
+				break;
+			}
+		}
 	} else {
 		m->missed_shots++;
 	}
@@ -568,6 +594,7 @@ enum game_status_e Gui::make_actions() {
 			if (actions_menu(FORFEIT) == 0) {
 				return QUITTING;
 			}
+			return NO_ATK;
 			break;
 	}
 	return PROGRESS;
@@ -585,7 +612,6 @@ bool Gui::singleplayer() {
 		paint_sea(true);
 		m->status = make_actions();
 		if (m->status == PROGRESS) {
-			//sleep(1);
 			m->ai_attack();
 			if (m->ai_hits == SHOTS_TO_WIN) {
 				m->status = LOSE;

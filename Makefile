@@ -1,5 +1,5 @@
 # Project name
-NAME = seabattle
+NAME = seabattles
 
 # Example: cpp, c ...
 EXT = cpp
@@ -15,40 +15,44 @@ CFLAGS = -Wall
 INCLUDE = include
 SOURCE = src
 BIN = bin
+MK = make
 
+ifneq ($(OS), Windows_NT)
 RM = rm
 MV = mv
 CP = cp
 
-ifeq ($(OS), Windows_NT)
-# Install path (Windows)
-	DEST = C:\\Programs\\$(NAME)
-# Other compilation extras, leave empty if nothing extra
-	OTHER = 
-# Executable name & extension
-	EXECUTABLE = $(NAME).exe
-#########################################################
-	MK = mingw32-make
-	DBG = gdb
-else
 # Install path (MacOS / Linux)
-	DEST = /usr/local/bin
+DEST = /usr/local/bin
 # Other compilation extras, leave empty if nothing extra
-	OTHER = 
+OTHER = 
 # Executable name & extension (or no extension)
-	EXECUTABLE = $(NAME)
-#########################################################
-	MK = make
+EXECUTABLE = $(NAME)
+else
+RM = del
+RMDIR = rmdir
+MV = move
+CP = copy
+
+# Install path (Windows)
+DEST = C:/Program Files/$(NAME)_pgm
+# Other compilation extras, leave empty if nothing extra
+OTHER = icons/icon.res
+# Executable name & extension (or no extension)
+EXECUTABLE = $(NAME).exe
+endif
+
 ifeq ($(shell uname -s), Darwin)
 	DBG = lldb
 else
 	DBG = gdb
 endif
-endif
 
 default: build
 
 build:
+ifneq ($(OS), Windows_NT)
+
 ifeq ($(wildcard $(BIN)/.*),)
 	@mkdir $(BIN)
 endif
@@ -71,22 +75,46 @@ ifneq ($(suppress), true)
 endif
 endif
 
-run:
-ifeq ($(OS), Windows_NT)
-	@$(EXECUTABLE)
 else
+
+ifeq ($(wildcard $(BIN)/.*),)
+	@mkdir $(BIN) >nul
+endif
+ifndef debug
+	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
+else
+ifeq ($(debug), true)
+	@$(CC) $(CFLAGS) -g -I $(INCLUDE) -c src/*.$(EXT)
+else
+	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
+endif
+endif
+	@$(CC) *.o $(LIBRARIES) $(OTHER) -o $(EXECUTABLE)
+	@for /r %%x in (*.o) do $(MV) "%%x" "$(BIN)" >nul
+ifndef suppress
+	@echo [Makefile] Done
+else
+ifneq ($(suppress), true)
+	@echo [Makefile] Done
+endif
+endif
+
+endif
+
+run:
+ifneq ($(OS), Windows_NT)
 	@./$(EXECUTABLE)
+else
+	@$(EXECUTABLE)
 endif
 
 debug:
 	@make build debug=true suppress=true
-ifeq ($(OS), Windows_NT)
-	@$(DBG) $(EXECUTABLE)
-else
 	@$(DBG) ./$(EXECUTABLE)
-endif
 
 setup:
+ifneq ($(OS), Windows_NT)
+
 ifeq ($(wildcard $(SOURCE)/.*),)
 	@mkdir $(SOURCE)
 endif
@@ -95,14 +123,23 @@ ifeq ($(wildcard $(INCLUDE)/.*),)
 endif
 	@echo [Makefile] Done
 
-clean:
-ifneq ($(wildcard $(BIN)/.*),)
-ifeq ($(OS), Windows_NT)
-	@$(RM) $(BIN)/* /q
-	@$(RMDIR) $(BIN) /q
 else
-	@$(RM) -r $(BIN)
+
+ifeq ($(wildcard $(SOURCE)/.*),)
+	@mkdir $(SOURCE) >nul
 endif
+ifeq ($(wildcard $(INCLUDE)/.*),)
+	@mkdir $(INCLUDE) >nul
+endif
+	@echo [Makefile] Done
+
+endif
+
+clean:
+ifneq ($(OS), Windows_NT)
+
+ifneq ($(wildcard $(BIN)/.*),)
+	@$(RM) -r $(BIN)
 ifneq ($(wildcard $(EXECUTABLE)),)
 	@$(RM) $(EXECUTABLE)
 endif
@@ -112,40 +149,65 @@ endif
 endif
 	@echo [Makefile] Done
 
+else
+
+ifneq ($(wildcard $(BIN)/.*),)
+	@$(RM) $(BIN) /q >nul
+	@$(RMDIR) $(BIN) /q >nul
+ifneq ($(wildcard $(EXECUTABLE)),)
+	@$(RM) $(EXECUTABLE) /q >nul
+endif
+ifneq ($(wildcard .*),)
+	@for /r %%x in (*.o) do $(RM) "%%x" /q >nul
+endif
+endif
+	@echo [Makefile] Done
+
+endif
+
 install:
+ifneq ($(OS), Windows_NT)
+
 ifeq ($(shell id -u), 0)
 ############# Install ###############
 	@make build suppress=true
-ifeq ($(OS), Windows_NT)
-# Windows
-ifdef cmd
-# Add to cmd
-endif
-# Installation in programs
-else
-# MacOS & Linux
 	@$(CP) ./$(EXECUTABLE) $(DEST)
-endif
 	@echo [Makefile] Installed
 #####################################
 else
-	@echo [Makefile] Root/Administrator required!
+	@echo [Makefile] Root required!
+endif
+
+else
+
+	@mkdir "$(DEST)" >nul
+	@$(MK) build suppress=true --no-print-directory
+	@$(CP) $(EXECUTABLE) "$(DEST)" >nul
+	@echo [Makefile] Installed
+
 endif
 
 remove:
+ifneq ($(OS), Windows_NT)
+
 ifeq ($(shell id -u), 0)
 ifneq ($(wildcard $(DEST)/$(EXECUTABLE)),)
 ############# Remove ###############
-ifeq ($(OS), Windows_NT)
-	@$(RM) $(DEST) /q
-else
 	@$(RM) $(DEST)/$(EXECUTABLE)
-endif
 	@echo [Makefile] Done
 ####################################
 else
 	@echo [Makefile] Program not installed
 endif
 else
-	@echo [Makefile] Root/Administrator required!
+	@echo [Makefile] Root required!
+endif
+
+else
+
+	@$(RM) "$(DEST)" /q >nul
+	@$(RMDIR) "$(DEST)" /q >nul
+	@$(RM) /f "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Sea Battles.lnk" /q >nul
+	@echo [Makefile] Program removed!
+
 endif

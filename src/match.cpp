@@ -39,6 +39,7 @@ void Match::reset(enum gamemode g) {
 	for (int i = 0; i < SHIPS_COUNT; i++) {
 		ships[i]->setX(0);
 		ships[i]->setY(BOARD_SIZE - 1);
+		ships[i]->reset_hits();
 	}
 }
 
@@ -304,6 +305,12 @@ void Match::ai_attack() {
 
 	if (board[rand_y][rand_x] > DAMAGE) {
 		ai_hits++;
+		for (int i = 0; i < SHIPS_COUNT; i++) {
+			if (ships[i]->point_intersect(rand_x, rand_y)) {
+				ships[i]->add_hit();
+				break;
+			}
+		}
 	}
 }
 
@@ -318,7 +325,7 @@ string Match::get_duration() {
 	long seconds = difference.count();
 	int min = seconds / 60;
 	seconds = seconds % 60;
-	return to_string(min) + " : " + to_string(seconds);
+	return to_string(min) + " : " + ((int)(seconds / 10) == 0 ? "0" : "") + to_string(seconds);
 }
 
 enum grade_e Match::get_grade() {
@@ -328,7 +335,7 @@ enum grade_e Match::get_grade() {
 
 	if (hit_perc >= 90) {
 		grade = S;
-	} else if (hit_perc >= 70) {
+	} else if (hit_perc >= 75) {
 		grade = A;
 	} else if (hit_perc >= 50) {
 		grade = B;

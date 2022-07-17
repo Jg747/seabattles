@@ -15,13 +15,18 @@ class Ship {
 		char pos_x;
 		char pos_y;
 		bool isPlaced;
-		char id;
+		int id;
+		int hits;
 
 	public:
+
 		Ship(int type);
 		Ship(enum ship_e type);
 		string info();
 		int place_ship(enum command_e cmd);
+		bool point_intersect(int x, int y);
+		void add_hit();
+		void reset_hits();
 
 		int getX();
 		int getY();
@@ -34,6 +39,7 @@ class Ship {
 		void setX(int x);
 		void setY(int y);
 		void setRotation(enum rotation_e r);
+		bool is_sunk();
 
 		static bool evaluate_pos(int x, int y, int len, enum rotation_e rotate);
 };

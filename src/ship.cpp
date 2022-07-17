@@ -18,6 +18,7 @@ Ship::Ship(int type) {
 	this->pos_x = 0;
 	this->pos_y = BOARD_SIZE - 1;
 	this->length = ships_len[this->type];
+	this->hits = 0;
 }
 
 Ship::Ship(enum ship_e type) {
@@ -27,6 +28,7 @@ Ship::Ship(enum ship_e type) {
 	this->pos_x = 0;
 	this->pos_y = BOARD_SIZE - 1;
 	this->length = ships_len[type];
+	this->hits = 0;
 }
 
 string Ship::info() {
@@ -193,4 +195,34 @@ void Ship::setY(int y) {
 
 void Ship::setRotation(enum rotation_e r) {
 	this->rotation = r;
+}
+
+bool Ship::point_intersect(int x, int y) {
+	switch (rotation) {
+		case UP:
+			return y >= this->pos_y - this->length && y <= this->pos_y && x == this->pos_x;
+			break;
+		case RIGHT:
+			return x <= this->pos_x + this->length && x >= this->pos_x && y == this->pos_y;
+			break;
+		case DOWN:
+			return y <= this->pos_y + this->length && y >= this->pos_y && x == this->pos_x;
+			break;
+		case LEFT:
+			return x >= this->pos_x - this->length && x <= this->pos_x && y == this->pos_y;
+			break;
+	}
+	return false;
+}
+
+bool Ship::is_sunk() {
+	return this->hits == this->length;
+}
+
+void Ship::add_hit() {
+	this->hits++;
+}
+
+void Ship::reset_hits() {
+	this->hits = 0;
 }
