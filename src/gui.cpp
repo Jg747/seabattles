@@ -20,7 +20,7 @@ Gui::~Gui() {
 	del_array_win(start_menu, 2);
 	if (this->m != NULL) {
 		delete m;
-		delwin(sea_border);
+		del_array_win(sea_border, 2);
 		for (int i = 0; i < BOARD_SIZE + 1; i++) {
 			for (int j = 0; j < BOARD_SIZE + 1; j++) {
 				delwin(sea[i][j]);
@@ -77,10 +77,13 @@ void Gui::init_game_windows() {
 	int col = COLS * PERCENT_SEA / 100;
 	int line = LINES - 3;
 
-	sea_border = newwin(line, col + 1, 2, 1);
-	box(sea_border, ACS_VLINE, ACS_HLINE);
+	sea_border[1] = newwin(line, col + 1, 2, 1);
+	box(sea_border[1], ACS_VLINE, ACS_HLINE);
 
-	wrefresh(sea_border);
+	sea_border[0] = newwin(line - 2, col - 1, 3, 2);
+
+	wrefresh(sea_border[1]);
+	wrefresh(sea_border[0]);
 
 	// SEA
 	init_sea();
@@ -114,6 +117,8 @@ void Gui::init_sea() {
 	char col_name = 'A';
 	int row_name = 1;
 	bool blue = true;
+
+	write_fleet_type(true);
 
 	for (int i = 0; i < BOARD_SIZE + 1; i++) {
 		x = 2 + x_off;
@@ -177,6 +182,20 @@ int Gui::game_menu() {
 	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 3, ">", true);
 }
 
+int Gui::diff_menu() {
+	int x, y;
+	get_win_size(start_menu[0], x, y);
+	wclear(start_menu[0]);
+	mvwrite_on_window(start_menu[0], x/2 - 8, y/2 - 4, "SELECT DIFFICULTY");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Normal");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Hard");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2, "  Impossible");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 + 2, "  Back");
+	wrefresh(start_menu[0]);
+
+	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 4, ">", true);
+}
+
 int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool step_last) {
 	string space;
 	for (int i = 0; symbol[i]; i++) {
@@ -212,12 +231,25 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 	return select;
 }
 
+void Gui::write_fleet_type(bool my_sea) {
+	int width, height;
+	get_win_size(sea_border[0], width, height);
+	if (my_sea) {
+		mvwrite_on_window(sea_border[0], width/2 - 5 < 0 ? 0 : width/2 - 5, 0, "YOUR FLEET");
+	} else {
+		mvwrite_on_window(sea_border[0], width/2 - 5 < 0 ? 0 : width/2 - 5, 0, "ENEMY FLEET");
+	}
+	wrefresh(sea_border[0]);
+}
+
 void Gui::paint_sea(bool my_sea) {
 	int height, width;
-	get_win_size(sea[0][0], width, height);
-
 	bool blue = false;
 	int i, j, k;
+
+	write_fleet_type(my_sea);
+	get_win_size(sea[0][0], width, height);
+	
 	for (i = 1; i < BOARD_SIZE + 1; i++) {
 		for (j = 1; j < BOARD_SIZE + 1; j++) {
 			if (height > 1) {
@@ -473,10 +505,10 @@ bool Gui::place_ships() {
 		choice = actions_menu(PLACE_SHIPS);
 		if (choice == 5) {
 			if (m->remaining_ships() < SHIPS_COUNT) {
-				mvwrite_on_window(actions[0], width/2 - 7, height/2 + 7, "[Must place all ships!]");
+				mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12 < 0, height/2 + 7, "[Must place all ships!]");
 				wrefresh(actions[0]);
 				sleep(2);
-				mvwrite_on_window(actions[0], width/2 - 7, height/2 + 6, "                       ");
+				mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12 < 0, height/2 + 6, "                       ");
 				wrefresh(actions[0]);
 			} else {
 				confirm = true;
@@ -498,7 +530,17 @@ bool Gui::place_ships() {
 
 void Gui::paint_attack(int x, int y) {
 	if (m->enemy_board[y][x] > DAMAGE) {
-		color_tile(y, x, COLOR_NOT_HIT);
+		int i;
+		for (i = 0; i < SHIPS_COUNT; i++) {
+			if (m->enemy[i]->point_intersect(x, y)) {
+				break;
+			}
+		}
+		if (!m->enemy[i]->is_sunk()) {
+			color_tile(y, x, COLOR_NOT_HIT);
+		} else {
+			color_tile(y, x, COLOR_HIT);
+		}
 	} else if (m->enemy_board[y][x] == DAMAGE) {
 		color_tile(y, x, COLOR_HIT);
 	} else {
@@ -508,11 +550,12 @@ void Gui::paint_attack(int x, int y) {
 
 int Gui::attack() {
 	actions_menu(ATTACK);
+
 	int x = 0;
 	int y = 0;
 
 	paint_sea(false);
-	color_tile(y, x, COLOR_SELECT_HIT);
+	paint_attack(y, x);
 
 	retry:
 	int ch = 0;
@@ -560,6 +603,7 @@ int Gui::attack() {
 	}
 	
 	m->enemy_board[y][x] += DAMAGE;
+
 	if (m->enemy_board[y][x] > DAMAGE) {
 		m->hit_shots++;
 		for (int i = 0; i < SHIPS_COUNT; i++) {
@@ -579,7 +623,9 @@ enum game_status_e Gui::make_actions() {
 	int choice = actions_menu(GAME);
 	switch (choice) {
 		case 0:
-			attack();
+			if (attack() == -1) {
+				return NO_ATK;
+			}
 			if (m->hit_shots == SHOTS_TO_WIN) {
 				return WIN;
 			}
@@ -634,7 +680,9 @@ bool Gui::singleplayer() {
 		mvwrite_on_window(start_menu[0], width/2 - 8, height/2, "Shots missed: " + to_string(m->missed_shots));
 		mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 1, "Hits: " + to_string(m->hit_shots));
 		mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 2, "Match time [" + m->get_duration() + "]");
-		mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 3, "Grade: " + string(1, m->get_grade()));
+		if (m->status == WIN) {
+			mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 3, "Grade: " + string(1, m->get_grade()));
+		}
 		mvwrite_on_window(start_menu[0], width/2 - 13, height/2 + 5, "[press any key to continue]");
 		wrefresh(start_menu[1]);
 		wrefresh(start_menu[0]);
@@ -654,12 +702,19 @@ bool Gui::start() {
 		return false;
 	}
 	choice = 0;
+
+	int diff = diff_menu();
+	if (diff == 3) {
+		return true;
+	}
+
 	init_game_windows();
-	
+
 	if (m == NULL) {
-		m = new Match((enum gamemode)choice);
+		m = new Match((enum gamemode)choice, (enum single_difficulty_e)diff);
 	} else {
 		m->reset((enum gamemode)choice);
+		m->set_difficulty((enum single_difficulty_e)diff);
 	}
 
 	switch (choice) {

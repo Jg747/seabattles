@@ -36,7 +36,7 @@ class Gui {
 		WINDOW *game_wrapper[2];
 		WINDOW *start_menu[2];
 
-		WINDOW *sea_border;
+		WINDOW *sea_border[2];
 		WINDOW *sea[BOARD_SIZE + 1][BOARD_SIZE + 1];
 		WINDOW *actions[2];
 
@@ -50,6 +50,7 @@ class Gui {
 		bool singleplayer();
 
 		int game_menu();
+		int diff_menu();
 		int actions_menu(enum action_e a);
 		bool place_ships();
 		int place_a_ship(int index);
@@ -62,6 +63,7 @@ class Gui {
 		string get_input(WINDOW *w);
 		int menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool step_last);
 		
+		void write_fleet_type(bool my_sea);
 		void paint_sea(bool my_sea);
 		void paint_actions_menu(enum action_e a, int &width, int &height);
 		void paint_ship(int index, Ship *&ship, bool my_sea);

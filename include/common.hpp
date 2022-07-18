@@ -67,4 +67,19 @@ enum grade_e {
 	D = 'D'
 };
 
+enum single_difficulty_e {
+	NORMAL,
+	HARD,
+	IMPOSSIBLE
+};
+
+struct ai_last_atk {
+	int x;
+	int y;
+	enum rotation_e direction;
+	int back_x;
+	int back_y;
+	enum rotation_e back_direction;
+};
+
 #endif
