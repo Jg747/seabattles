@@ -2,9 +2,18 @@
 #include <debug.hpp>
 
 int main(int argc, char *argv[]) {
-	START_DEBUG()
+	bool debug = true;
+	
+	if (debug) {
+		START_DEBUG();
+	}
+	
 	Gui g;
 	while (g.start());
-	STOP_DEBUG()
-    return 0;
+	
+	if (debug) {
+		STOP_DEBUG();
+	}
+    
+	return 0;
 }

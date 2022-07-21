@@ -287,7 +287,15 @@ void Gui::paint_sea(bool my_sea) {
 						wbkgd(sea[i][j], COLOR_PAIR(COLOR_HIT));
 					}
 				} else {
-					wbkgd(sea[i][j], COLOR_PAIR(COLOR_SHIP));
+					if (debug_mode) {
+						wbkgd(sea[i][j], COLOR_PAIR(COLOR_SHIP));
+					} else {
+						if (blue) {
+							wbkgd(sea[i][j], COLOR_PAIR(COLOR_BLUE_TILE));
+						} else {
+							wbkgd(sea[i][j], COLOR_PAIR(COLOR_AQUA_TILE));
+						}
+					}
 				}
 			} else {
 				if (blue) {
@@ -504,12 +512,16 @@ bool Gui::place_ships() {
 	while (!confirm) {
 		choice = actions_menu(PLACE_SHIPS);
 		if (choice == 5) {
-			if (m->remaining_ships() < SHIPS_COUNT) {
-				mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12 < 0, height/2 + 7, "[Must place all ships!]");
-				wrefresh(actions[0]);
-				sleep(2);
-				mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12 < 0, height/2 + 6, "                       ");
-				wrefresh(actions[0]);
+			if (!debug_mode) {
+				if (m->remaining_ships() < SHIPS_COUNT) {
+					mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12, height/2 + 7, "[Must place all ships!]");
+					wrefresh(actions[0]);
+					sleep(2);
+					mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12, height/2 + 6, "                       ");
+					wrefresh(actions[0]);
+				} else {
+					confirm = true;
+				}
 			} else {
 				confirm = true;
 			}
