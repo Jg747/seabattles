@@ -15,6 +15,7 @@ class Match {
 		static void set_time(time_t &time);
 		string get_duration();
 		enum grade_e get_grade();
+		enum gamemode get_mode();
 
 		void set_difficulty(enum single_difficulty_e diff);
 		

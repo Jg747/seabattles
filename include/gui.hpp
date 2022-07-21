@@ -16,6 +16,10 @@ using std::string;
 
 #define PERCENT_SEA 75
 
+#define CORRECT(x, b) (x < 0 ? 0 : (x > b - 1 ? b - 1 : x))
+#define CORRECT_W(x) CORRECT(x, COLS)
+#define CORRECT_H(y) CORRECT(y, LINES)
+
 enum colors {
 	COLOR_SHIP = 0x01,
 	COLOR_BLUE_TILE = 0x02,
@@ -56,6 +60,10 @@ class Gui {
 		int place_a_ship(int index);
 		enum game_status_e make_actions();
 		int attack();
+		int multi_menu();
+		void wait_conn_menu();
+		bool join_menu();
+		void waiting_host();
 
 		void get_win_size(WINDOW *w, int &width, int &height);
 		void write_on_window(WINDOW *w, string str);

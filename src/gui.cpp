@@ -187,10 +187,23 @@ int Gui::diff_menu() {
 	get_win_size(start_menu[0], x, y);
 	wclear(start_menu[0]);
 	mvwrite_on_window(start_menu[0], x/2 - 8, y/2 - 4, "SELECT DIFFICULTY");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Normal");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Hard");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2, "  Impossible");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 + 2, "  Back");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 - 2, "> Normal");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 - 1, "  Hard");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2, "  Impossible");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 + 2, "  Back");
+	wrefresh(start_menu[0]);
+
+	return menu_cursor(start_menu[0], x/2 - 3, y/2 - 2, 4, ">", true);
+}
+
+int Gui::multi_menu() {
+	int x, y;
+	get_win_size(start_menu[0], x, y);
+	wclear(start_menu[0]);
+	mvwrite_on_window(start_menu[0], x/2 - 5, y/2 - 4, "MULTIPLAYER");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Host a match");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Join a match");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2, "  Back");
 	wrefresh(start_menu[0]);
 
 	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 4, ">", true);
@@ -229,6 +242,76 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 	}
 
 	return select;
+}
+
+void Gui::wait_conn_menu() {
+	// TO-DO
+}
+
+bool Gui::join_menu() {
+	int width, height;
+	get_win_size(start_menu[0], width, height);
+	
+	wclear(start_menu[0]);
+	mvwrite_on_window(start_menu[0], width/2 - 5, height/2 - 4, "MULTIPLAYER");
+	mvwrite_on_window(start_menu[0], width/2 - 6, height/2 - 2, "Enter host IP");
+	mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "> back      join");
+	
+	WINDOW *ip = newwin(3, 24, height/2 + 2, width/2 - 10 < 0 ? 0 : width/2 - 10);
+	box(ip, ACS_VLINE, ACS_HLINE);
+
+	wrefresh(start_menu[0]);
+	wrefresh(ip);
+
+	int car, choice;
+	string str;
+
+	//do {
+		while (car != '\n') {
+			keypad(start_menu[0], TRUE);
+			car = wgetch(start_menu[0]);
+			keypad(start_menu[0], FALSE);
+			switch (car) {
+				case KEY_LEFT:
+					mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "> back      join");
+					wrefresh(start_menu[0]);
+					choice = 0;
+					break;
+				case KEY_RIGHT:
+					mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "  back    > join");
+					wrefresh(start_menu[0]);
+					choice = 1;
+					break;
+				case KEY_BACKSPACE:
+					if (!str.empty()) {
+						str.pop_back();
+						mvwprintw(ip, 1, 1, "%s ", str.c_str());
+						wrefresh(ip);
+					}
+					break;
+				default:
+					if ((car >= '0' && car <= '9') || car == '.' || car == ':') {
+						str.push_back(car);
+						mvwprintw(ip, 1, 1, "%s", str.c_str());
+						wrefresh(ip);
+					}
+					break;
+			}
+		}
+
+		if (choice == 0) {
+			return false;
+		}
+	//} while (!check_conn);
+	wprintw(start_menu[0], "%s", str.c_str());
+	wrefresh(start_menu[0]);
+	sleep(2);
+
+	return true;
+}
+
+void Gui::waiting_host() {
+	// TO-DO
 }
 
 void Gui::write_fleet_type(bool my_sea) {
@@ -352,7 +435,7 @@ void Gui::paint_actions_menu(enum action_e a, int &width, int &height) {
 			mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12, height/2, "[press any key to return]");
 			break;
 		case ATTACK:
-			mvwrite_on_window(actions[0], width/2 - 3 < 0 ? 0 : width/2 - 3, height/2 - 2, "ATTACK");
+			mvwrite_on_window(actions[0], width/2 - 4 < 0 ? 0 : width/2 - 4, height/2 - 2, "ATTACKING");
 			mvwrite_on_window(actions[0], width/2 - 7 < 0 ? 0 : width/2 - 7, height/2, "Arrow keys to move");
 			mvwrite_on_window(actions[0], width/2 - 7 < 0 ? 0 : width/2 - 7, height/2 + 2, "ENTER to attack");
 			mvwrite_on_window(actions[0], width/2 - 7 < 0 ? 0 : width/2 - 7, height/2 + 3, "Q to return");
@@ -709,24 +792,46 @@ bool Gui::start() {
 	wrefresh(start_menu[1]);
 	wrefresh(start_menu[0]);
 
-	int choice = game_menu();
+	int choice, diff;
+
+	choice = game_menu();
 	if (choice == 2) {
 		return false;
 	}
-	choice = 0;
-
-	int diff = diff_menu();
-	if (diff == 3) {
-		return true;
+	
+	if (choice == SINGLEPLAYER) {
+		diff = diff_menu();
+		if (diff == 3) {
+			return true;
+		}
+	} else {
+		diff = multi_menu();
+		switch (diff) {
+			case 0:
+				wait_conn_menu();
+				break;
+			case 1:
+				if (join_menu()) {
+					waiting_host();
+				} else {
+					return true;
+				}
+				break;
+			case 2:
+				return true;
+				break;
+		}
 	}
 
 	init_game_windows();
 
-	if (m == NULL) {
-		m = new Match((enum gamemode)choice, (enum single_difficulty_e)diff);
-	} else {
-		m->reset((enum gamemode)choice);
-		m->set_difficulty((enum single_difficulty_e)diff);
+	if (choice == SINGLEPLAYER) {
+		if (m == NULL) {
+			m = new Match((enum gamemode)choice, (enum single_difficulty_e)diff);
+		} else {
+			m->reset((enum gamemode)choice);
+			m->set_difficulty((enum single_difficulty_e)diff);
+		}
 	}
 
 	switch (choice) {

@@ -25,7 +25,7 @@ CP = cp
 # Install path (MacOS / Linux)
 DEST = /usr/local/bin
 # Other compilation extras, leave empty if nothing extra
-OTHER = 
+OTHER = -static-libstdc++
 # Executable name & extension (or no extension)
 EXECUTABLE = $(NAME)
 else
@@ -37,7 +37,7 @@ CP = copy
 # Install path (Windows)
 DEST = C:/Program Files/$(NAME)_pgm
 # Other compilation extras, leave empty if nothing extra
-OTHER = icons/icon.res
+OTHER = icons/icon.res -static-libstdc++
 # Executable name & extension (or no extension)
 EXECUTABLE = $(NAME).exe
 endif

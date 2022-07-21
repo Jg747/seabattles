@@ -526,3 +526,7 @@ void Match::reset_ai_atk() {
 	ai_atk.x = -1;
 	ai_atk.y = -1;
 }
+
+enum gamemode Match::get_mode() {
+	return this->mode;
+}
