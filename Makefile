@@ -18,17 +18,21 @@ BIN = bin
 MK = make
 
 ifneq ($(OS), Windows_NT)
+
 RM = rm
 MV = mv
 CP = cp
+LIBRARIES += -ltinfo
 
 # Install path (MacOS / Linux)
 DEST = /usr/local/bin
 # Other compilation extras, leave empty if nothing extra
-OTHER = -static-libstdc++
+OTHER = 
 # Executable name & extension (or no extension)
 EXECUTABLE = $(NAME)
+
 else
+
 RM = del
 RMDIR = rmdir
 MV = move
@@ -37,9 +41,10 @@ CP = copy
 # Install path (Windows)
 DEST = C:/Program Files/$(NAME)_pgm
 # Other compilation extras, leave empty if nothing extra
-OTHER = icons/icon.res -static-libstdc++
+OTHER = icons/icon.res
 # Executable name & extension (or no extension)
 EXECUTABLE = $(NAME).exe
+
 endif
 
 ifeq ($(shell uname -s), Darwin)
@@ -65,7 +70,7 @@ else
 	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
 endif
 endif
-	@$(CC) *.o $(LIBRARIES) $(OTHER) -o $(EXECUTABLE)
+	@$(CC) *.o $(OTHER) -o $(EXECUTABLE) $(LIBRARIES)
 	@$(MV) *.o $(BIN)
 ifndef suppress
 	@echo [Makefile] Done
@@ -89,7 +94,7 @@ else
 	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
 endif
 endif
-	@$(CC) *.o $(LIBRARIES) $(OTHER) -o $(EXECUTABLE)
+	@$(CC) *.o $(OTHER) -o $(EXECUTABLE) $(LIBRARIES)
 	@for /r %%x in (*.o) do $(MV) "%%x" "$(BIN)" >nul
 ifndef suppress
 	@echo [Makefile] Done
