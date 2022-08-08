@@ -22,7 +22,6 @@ ifneq ($(OS), Windows_NT)
 RM = rm
 MV = mv
 CP = cp
-LIBRARIES += -ltinfo
 
 # Install path (MacOS / Linux)
 DEST = /usr/local/bin
@@ -33,10 +32,13 @@ EXECUTABLE = $(NAME)
 
 else
 
-RM = del
-RMDIR = rmdir
-MV = move
-CP = copy
+#RM = del
+#RMDIR = rmdir
+#MV = move
+#CP = copy
+RM = rm
+MV = mv
+CP = cp
 
 # Install path (Windows)
 DEST = C:/Program Files/$(NAME)_pgm
@@ -51,6 +53,13 @@ ifeq ($(shell uname -s), Darwin)
 	DBG = lldb
 else
 	DBG = gdb
+#	OTHER += -static
+endif
+
+ifneq ($(shell uname -s), Darwin)
+ifneq ($(OS), Windows_NT)
+	LIBRARIES += -ltinfo
+endif
 endif
 
 default: build
@@ -83,7 +92,7 @@ endif
 else
 
 ifeq ($(wildcard $(BIN)/.*),)
-	@mkdir $(BIN) >nul
+	@mkdir $(BIN)
 endif
 ifndef debug
 	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
@@ -95,7 +104,8 @@ else
 endif
 endif
 	@$(CC) *.o $(OTHER) -o $(EXECUTABLE) $(LIBRARIES)
-	@for /r %%x in (*.o) do $(MV) "%%x" "$(BIN)" >nul
+#	for /r %x in (*.o) do $(MV) "%x" "$(BIN)"
+	@mv *.o $(BIN)
 ifndef suppress
 	@echo [Makefile] Done
 else
@@ -131,10 +141,10 @@ endif
 else
 
 ifeq ($(wildcard $(SOURCE)/.*),)
-	@mkdir $(SOURCE) >nul
+	@mkdir $(SOURCE)
 endif
 ifeq ($(wildcard $(INCLUDE)/.*),)
-	@mkdir $(INCLUDE) >nul
+	@mkdir $(INCLUDE)
 endif
 	@echo [Makefile] Done
 
@@ -157,13 +167,15 @@ endif
 else
 
 ifneq ($(wildcard $(BIN)/.*),)
-	@$(RM) $(BIN) /q >nul
-	@$(RMDIR) $(BIN) /q >nul
+	@$(RM) $(BIN)
+#	@$(RMDIR) $(BIN) /q >nul
 ifneq ($(wildcard $(EXECUTABLE)),)
-	@$(RM) $(EXECUTABLE) /q >nul
+#	@$(RM) $(EXECUTABLE) /q >nul
+	@$(RM) $(EXECUTABLE)
 endif
 ifneq ($(wildcard .*),)
-	@for /r %%x in (*.o) do $(RM) "%%x" /q >nul
+#	@for /r %%x in (*.o) do $(RM) "%%x" /q >nul
+	@rm *.o
 endif
 endif
 	@echo [Makefile] Done
@@ -185,9 +197,11 @@ endif
 
 else
 
-	@mkdir "$(DEST)" >nul
+#	@mkdir "$(DEST)" >nul
+	@mkdir "$(DEST)"
 	@$(MK) build suppress=true --no-print-directory
-	@$(CP) $(EXECUTABLE) "$(DEST)" >nul
+#	@$(CP) $(EXECUTABLE) "$(DEST)" >nul
+	@$(CP) $(EXECUTABLE) "$(DEST)"
 	@echo [Makefile] Installed
 
 endif
