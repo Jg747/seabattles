@@ -5,6 +5,7 @@ bin
 *.exe
 *.out
 *.log
+test*
 .DS_store
 .clang_complete
 seabattle
