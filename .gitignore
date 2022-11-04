@@ -1,10 +1,11 @@
 .vscode
 bin
 *.o
+*.o.d
 *.exe
-test.*
 *.out
 *.log
 .DS_store
 .clang_complete
 seabattle
+seabattles

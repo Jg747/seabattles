@@ -1,209 +1,133 @@
+#########################################################
 # Project name
-NAME = seabattles
+NAME := seabattles
+APP_NAME := $(NAME)
 
 # Example: cpp, c ...
-EXT = cpp
+EXT := cpp
 
 # Compilers: gcc, g++, clang, clang++
-CC = g++
+CC := g++
 
 # Example: -lncurses -lyaml ...
-LIBRARIES = -lncurses
+LIBRARIES := -lncurses
+
+# Linker flags
+LFLAGS := 
+
+# Compiler flags
+CFLAGS := -Wall -std=c++20
+
+# Debug flags
+DBFLAGS := -fstack-protector-all
+
+ifneq ($(OS), Windows_NT)
+# Install path (MacOS / Linux)
+DEST := /usr/local/bin
+# Other compilation extras, leave empty if nothing extra
+OTHER := 
+# Executable name & extension (or no extension)
+EXECUTABLE := $(APP_NAME)
+else
+# Install path (Windows)
+DEST := C:/Program Files/$(NAME)_pgm
+# Other compilation extras, leave empty if nothing extra
+OTHER := icons/icon.res
+# Executable name & extension (or no extension)
+EXECUTABLE := $(APP_NAME).exe
+endif
+
+INCLUDE := include
+SRC := src
+BIN := bin
 #########################################################
 
-CFLAGS = -Wall
-INCLUDE = include
-SOURCE = src
-BIN = bin
-MK = make
+LFLAGS += $(OTHER)
+LFLAGS += $(LIBRARIES)
+CFLAGS += -I $(INCLUDE)
+
+DEBUG ?= false
+
+SRC_LIST := $(wildcard $(SRC)/*.$(EXT))
+OBJECTS := $(patsubst %.$(EXT),$(BIN)/%.o,$(SRC_LIST))
+OBJECTS := $(subst $(SRC)/,,$(OBJECTS))
 
 ifneq ($(OS), Windows_NT)
-
-RM = rm
-MV = mv
-CP = cp
-
-# Install path (MacOS / Linux)
-DEST = /usr/local/bin
-# Other compilation extras, leave empty if nothing extra
-OTHER = 
-# Executable name & extension (or no extension)
-EXECUTABLE = $(NAME)
-
+RM := rm -r
 else
-
-#RM = del
-#RMDIR = rmdir
-#MV = move
-#CP = copy
-RM = rm
-MV = mv
-CP = cp
-
-# Install path (Windows)
-DEST = C:/Program Files/$(NAME)_pgm
-# Other compilation extras, leave empty if nothing extra
-OTHER = icons/icon.res
-# Executable name & extension (or no extension)
-EXECUTABLE = $(NAME).exe
-
+RM := del
 endif
-
-ifeq ($(shell uname -s), Darwin)
-	DBG = lldb
-else
-	DBG = gdb
-#	OTHER += -static
-endif
-
-ifneq ($(shell uname -s), Darwin)
-ifneq ($(OS), Windows_NT)
-	LIBRARIES += -ltinfo
-endif
-endif
+RMDIR := rmdir
+CP := cp
 
 default: build
 
-build:
-ifneq ($(OS), Windows_NT)
+build: $(BIN)/$(EXECUTABLE)
+	@echo [Makefile] Done
 
-ifeq ($(wildcard $(BIN)/.*),)
+$(BIN)/$(EXECUTABLE): $(OBJECTS) Makefile
+ifeq ($(DEBUG), false)
+	$(CC) $(CFLAGS) $(OBJECTS) -o $(EXECUTABLE) $(LFLAGS)
+else
+	$(CC) $(CFLAGS) $(DBFLAGS) -g $(OBJECTS) -o $(EXECUTABLE) $(LFLAGS)
+endif
+
+$(BIN)/%.o: $(SRC)/%.$(EXT) | $(BIN)
+ifeq ($(DEBUG), false)
+	$(CC) $(CFLAGS) -MMD -MF $@.d -c $< -o $@
+else
+	$(CC) $(CFLAGS) -MMD -MF $@.d -g -c $< -o $@
+endif
+
+$(BIN):
 	@mkdir $(BIN)
-endif
-ifndef debug
-	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
-else
-ifeq ($(debug), true)
-	@$(CC) $(CFLAGS) -g -I $(INCLUDE) -c src/*.$(EXT)
-else
-	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
-endif
-endif
-	@$(CC) *.o $(OTHER) -o $(EXECUTABLE) $(LIBRARIES)
-	@$(MV) *.o $(BIN)
-ifndef suppress
-	@echo [Makefile] Done
-else
-ifneq ($(suppress), true)
-	@echo [Makefile] Done
-endif
-endif
 
-else
-
-ifeq ($(wildcard $(BIN)/.*),)
-	@mkdir $(BIN)
-endif
-ifndef debug
-	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
-else
-ifeq ($(debug), true)
-	@$(CC) $(CFLAGS) -g -I $(INCLUDE) -c src/*.$(EXT)
-else
-	@$(CC) $(CFLAGS) -I $(INCLUDE) -c src/*.$(EXT)
-endif
-endif
-	@$(CC) *.o $(OTHER) -o $(EXECUTABLE) $(LIBRARIES)
-#	for /r %x in (*.o) do $(MV) "%x" "$(BIN)"
-	@mv *.o $(BIN)
-ifndef suppress
-	@echo [Makefile] Done
-else
-ifneq ($(suppress), true)
-	@echo [Makefile] Done
-endif
-endif
-
-endif
+-include $(BIN)/*.o.d
 
 run:
 ifneq ($(OS), Windows_NT)
-	@./$(EXECUTABLE)
+	./$(EXECUTABLE)
 else
-	@$(EXECUTABLE)
+	$(EXECUTABLE)
 endif
 
-debug:
-	@make build debug=true suppress=true
-	@$(DBG) ./$(EXECUTABLE)
+debug: 
+	$(MAKE) clean 
+	$(MAKE) build DEBUG=true
 
 setup:
-ifneq ($(OS), Windows_NT)
-
-ifeq ($(wildcard $(SOURCE)/.*),)
-	@mkdir $(SOURCE)
+ifeq ($(wildcard $(SRC)/.*),)
+	mkdir $(SRC)
 endif
 ifeq ($(wildcard $(INCLUDE)/.*),)
-	@mkdir $(INCLUDE)
+	mkdir $(INCLUDE)
 endif
 	@echo [Makefile] Done
-
-else
-
-ifeq ($(wildcard $(SOURCE)/.*),)
-	@mkdir $(SOURCE)
-endif
-ifeq ($(wildcard $(INCLUDE)/.*),)
-	@mkdir $(INCLUDE)
-endif
-	@echo [Makefile] Done
-
-endif
 
 clean:
-ifneq ($(OS), Windows_NT)
-
-ifneq ($(wildcard $(BIN)/.*),)
-	@$(RM) -r $(BIN)
-ifneq ($(wildcard $(EXECUTABLE)),)
-	@$(RM) $(EXECUTABLE)
-endif
-ifneq ($(wildcard .*),)
-	@$(RM) *.o
-endif
-endif
+	$(RM) $(BIN)
 	@echo [Makefile] Done
-
-else
-
-ifneq ($(wildcard $(BIN)/.*),)
-	@$(RM) $(BIN)
-#	@$(RMDIR) $(BIN) /q >nul
-ifneq ($(wildcard $(EXECUTABLE)),)
-#	@$(RM) $(EXECUTABLE) /q >nul
-	@$(RM) $(EXECUTABLE)
-endif
-ifneq ($(wildcard .*),)
-#	@for /r %%x in (*.o) do $(RM) "%%x" /q >nul
-	@rm *.o
-endif
-endif
-	@echo [Makefile] Done
-
-endif
 
 install:
 ifneq ($(OS), Windows_NT)
 
 ifeq ($(shell id -u), 0)
 ############# Install ###############
-	@make build suppress=true
-	@$(CP) ./$(EXECUTABLE) $(DEST)
+	@make build
+	$(CP) ./$(EXECUTABLE) $(DEST)
 	@echo [Makefile] Installed
-#####################################
+############# Install ###############
 else
 	@echo [Makefile] Root required!
 endif
 
 else
-
-#	@mkdir "$(DEST)" >nul
+############# Install ###############
 	@mkdir "$(DEST)"
-	@$(MK) build suppress=true --no-print-directory
-#	@$(CP) $(EXECUTABLE) "$(DEST)" >nul
-	@$(CP) $(EXECUTABLE) "$(DEST)"
+	@make build --no-print-directory
+	$(CP) $(EXECUTABLE) "$(DEST)"
 	@echo [Makefile] Installed
-
+############# Install ###############
 endif
 
 remove:
@@ -212,9 +136,9 @@ ifneq ($(OS), Windows_NT)
 ifeq ($(shell id -u), 0)
 ifneq ($(wildcard $(DEST)/$(EXECUTABLE)),)
 ############# Remove ###############
-	@$(RM) $(DEST)/$(EXECUTABLE)
-	@echo [Makefile] Done
-####################################
+	$(RM) $(DEST)/$(EXECUTABLE)
+	@echo [Makefile] Program removed!
+############# Remove ###############
 else
 	@echo [Makefile] Program not installed
 endif
@@ -223,10 +147,9 @@ else
 endif
 
 else
-
-	@$(RM) "$(DEST)" /q >nul
-	@$(RMDIR) "$(DEST)" /q >nul
-	@$(RM) /f "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Sea Battles.lnk" /q >nul
+############# Remove ###############
+	$(RM) "$(DEST)" /q >nul
+	$(RMDIR) "$(DEST)" /q >nul
 	@echo [Makefile] Program removed!
-
+############# Remove ###############
 endif

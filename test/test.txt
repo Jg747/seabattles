@@ -1,0 +1,11 @@
+{=rMSG_GET_PLAYER_INFO
+id(1){[1]}
+name(1){[testone]}
+is_ai(1){[0]}
+winner(1){[0]}
+loser(1){[0]}
+grade(1){[D]}
+hits(1){[0]}
+misses(1){[0]}
+sunk ships(1){[0]}
+remaining ships(1){[5]}}

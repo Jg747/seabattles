@@ -11,7 +11,8 @@
 
 using std::string;
 
-#include <match.hpp>
+#include <single_match.hpp>
+#include <multi_match.hpp>
 #include <common.hpp>
 
 #define PERCENT_SEA 75
@@ -52,14 +53,16 @@ class Gui {
 		void init_sea();
 
 		bool singleplayer();
+		bool multiplayer();
 
 		int game_menu();
 		int diff_menu();
 		int actions_menu(enum action_e a);
-		bool place_ships();
-		int place_a_ship(int index);
-		enum game_status_e make_actions();
-		int attack();
+		bool place_ships(Player *p);
+		int place_a_ship(Player *p, int index);
+		enum game_status_e make_actions(Player &attacker, Player &defender);
+		int attack(Player &attacker, Player &defender);
+		
 		int multi_menu();
 		void wait_conn_menu();
 		bool join_menu();
@@ -71,12 +74,13 @@ class Gui {
 		string get_input(WINDOW *w);
 		int menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool step_last);
 		
-		void write_fleet_type(bool my_sea);
-		void paint_sea(bool my_sea);
+		void write_fleet_type(string who);
+		void paint_sea(Board &p_board);
+		void paint_enemy_sea(Player &p);
 		void paint_actions_menu(enum action_e a, int &width, int &height);
-		void paint_ship(int index, Ship *&ship, bool my_sea);
+		void paint_ship(Player &p, int index);
 		void color_tile(int i, int j, enum colors color);
-		void paint_attack(int x, int y);
+		void paint_attack(Board *b, int x, int y);
 };
 
 #endif

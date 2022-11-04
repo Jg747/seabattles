@@ -1,6 +1,9 @@
 #ifndef __common_h__
 #define __common_h__
 
+#define SERVER_PORT 10747
+#define SERVER_IP "127.0.0.1"
+
 #define BOARD_SIZE 10
 
 #define SHIPS_COUNT 5
@@ -10,7 +13,7 @@
 
 extern const int ships_len[];
 
-enum gamemode {
+enum gamemode_e {
 	SINGLEPLAYER,
 	MULTYPLAYER
 };
@@ -67,7 +70,7 @@ enum grade_e {
 	D = 'D'
 };
 
-enum single_difficulty_e {
+enum game_difficulty_e {
 	NORMAL,
 	HARD,
 	IMPOSSIBLE
@@ -80,6 +83,12 @@ struct ai_last_atk {
 	int back_x;
 	int back_y;
 	enum rotation_e back_direction;
+};
+
+struct attacked_player {
+	int player_id;
+	bool attacked;
+	struct ai_last_atk atk;
 };
 
 #endif

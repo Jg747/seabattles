@@ -3,11 +3,8 @@
 
 const int ships_len[] = {5, 4, 3, 3, 2};
 
-#include <iostream>
 #include <string>
 
-using std::cout;
-using std::cin;
 using std::string;
 using std::to_string;
 
@@ -32,7 +29,7 @@ Ship::Ship(enum ship_e type) {
 }
 
 string Ship::info() {
-	return "NAVE: " + to_string(this->type) + "\n"
+	return "SHIP: " + to_string(this->type) + "\n"
 			+ "isPlaced: " + to_string(isPlaced) + "\n"
 			+ "len: " + to_string(length) + "\n"
 			+ "x: " + to_string(pos_x) + "\n"
@@ -225,4 +222,62 @@ void Ship::add_hit() {
 
 void Ship::reset_hits() {
 	this->hits = 0;
+}
+
+int Ship::taken_hits() {
+	return this->hits;
+}
+
+string Ship::pos_to_string() {
+	switch (this->rotation) {
+		case UP:
+			return "up (" + to_string((int)this->rotation) + ")";
+			break;
+		case RIGHT:
+			return "right (" + to_string((int)this->rotation) + ")";
+			break;
+		case DOWN:
+			return "down (" + to_string((int)this->rotation) + ")";
+			break;
+		case LEFT:
+			return "left (" + to_string((int)this->rotation) + ")";
+			break;
+		default:
+			return "";
+			break;
+	}
+}
+
+string Ship::type_to_string() {
+	switch (this->type) {
+		case CARRIER:
+			return "carrier (" + to_string((int)this->type) + ")";
+			break;
+		case BATTLESHIP:
+			return "battleship (" + to_string((int)this->type) + ")";
+			break;
+		case DESTROYER:
+			return "destroyer (" + to_string((int)this->type) + ")";
+			break;
+		case SUBMARINE:
+			return "submarine (" + to_string((int)this->type) + ")";
+			break;
+		case PATROL:
+			return "patrol (" + to_string((int)this->type) + ")";
+			break;
+		default:
+			return "";
+			break;
+	}
+}
+
+string Ship::get_info() {
+	string str = "Ship (id: " + to_string(this->get_id()) + ")\n";
+	str += "type: " + this->type_to_string() + "\n";
+	str += "len: " + to_string(this->getLen() + '0') + "\n";
+	str += "rotation: " + this->pos_to_string() + "\n";
+	str += "pos: " + to_string(this->getX()) + ", " + to_string(this->getY()) + "\n";
+	str += "placed: " + string((this->is_placed() ? "true" : "false")) + "\n";
+	str += "hits_taken: " + to_string(this->taken_hits()) + "\n";
+	return str;
 }

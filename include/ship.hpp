@@ -40,8 +40,13 @@ class Ship {
 		void setY(int y);
 		void setRotation(enum rotation_e r);
 		bool is_sunk();
+		int taken_hits();
+		string pos_to_string();
+		string type_to_string();
 
 		static bool evaluate_pos(int x, int y, int len, enum rotation_e rotate);
+		
+		string get_info();
 };
 
 #endif
