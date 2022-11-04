@@ -33,7 +33,6 @@ class Server {
 		int server_socket;
 
 		std::vector<struct client*> clients;
-		struct fd_set sock_list;
 		
 		#ifdef _WIN32
 		// WINSOCK
@@ -41,6 +40,7 @@ class Server {
 		struct sockaddr_in server_addr;
 		struct sockaddr_in in_addr;
 		socklen_t in_addr_size;
+		struct fd_set sock_list;
 		#endif
 
 		bool add_new_client();

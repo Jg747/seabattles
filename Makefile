@@ -55,7 +55,7 @@ OBJECTS := $(subst $(SRC)/,,$(OBJECTS))
 ifneq ($(OS), Windows_NT)
 RM := rm -r
 else
-RM := del
+RM := del /q
 endif
 RMDIR := rmdir
 CP := cp

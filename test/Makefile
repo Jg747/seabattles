@@ -55,11 +55,11 @@ build: $(BIN)/$(EXECUTABLE)
 
 $(BIN)/$(EXECUTABLE): $(OBJECTS) Makefile
 ifeq ($(DEBUG), false)
-	$(CC) $(CFLAGS) -MMD -MF main.o.d -c main.cpp -o main.o
-	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(EXECUTABLE) $(LFLAGS)
+	$(CC) $(CFLAGS) -MMD -MF $(BIN)/main.o.d -c main.cpp -o $(BIN)/main.o
+	$(CC) $(CFLAGS) $(OBJECTS) $(BIN)/main.o -o $(EXECUTABLE) $(LFLAGS)
 else
-	$(CC) $(CFLAGS) -MMD -MF main.o.d -g -c main.cpp -o main.o
-	$(CC) $(CFLAGS) $(DBFLAGS) -g $(OBJECTS) main.o -o $(EXECUTABLE) $(LFLAGS)
+	$(CC) $(CFLAGS) -MMD -MF $(BIN)/main.o.d -g -c main.cpp -o $(BIN)/main.o
+	$(CC) $(CFLAGS) $(DBFLAGS) -g $(OBJECTS) $(BIN)/main.o -o $(EXECUTABLE) $(LFLAGS)
 endif
 
 $(BIN)/%.o: $(SRC)/%.$(EXT) | $(BIN)

@@ -18,6 +18,31 @@ is going to be your server
 #include <unistd.h>
 #endif
 
+#ifdef _WIN32
+Server::Server() {
+	
+}
+
+Server::~Server() {
+	
+}
+
+void Server::reset_fd_set() {
+	
+}
+
+bool Server::start() {
+	return true;
+}
+
+bool Server::add_new_client() {
+	return true;
+}
+
+bool Server::handle_client_request(struct client *c) {
+	return true;
+}
+#else
 Server::Server() {
 	memset(&error, 0, sizeof(error));
 
@@ -123,3 +148,4 @@ bool Server::add_new_client() {
 bool Server::handle_client_request(struct client *c) {
 	
 }
+#endif

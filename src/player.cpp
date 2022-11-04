@@ -102,8 +102,8 @@ bool Player::his_turn() {
 
 void Player::add_player_to_attack(Player &p) {
 	struct attacked_player atk = { 
-		.attacked = false,
 		.player_id = 0,
+		.attacked = false,
 		.atk = {
 			.x = -1,
 			.y = -1,
@@ -319,7 +319,7 @@ void Player::reset_ai_atk(Player &p) {
 }
 
 struct attacked_player *Player::get_attack_by_id(int id) {
-	for (int i = 0; i < attacks.size(); i++) {
+	for (size_t i = 0; i < attacks.size(); i++) {
 		if (attacks[i].player_id == id) {
 			return &attacks[i];
 		}
@@ -387,7 +387,7 @@ void Player::inc_sunk_ships() {
 
 string Player::attacks_to_string() {
 	string str = "{\n";
-	for (int i = 0; i < attacks.size(); i++) {
+	for (size_t i = 0; i < attacks.size(); i++) {
 		str += "player_id: " + std::to_string(attacks[i].player_id);
 		str += "\nis_attacked: " + string(attacks[i].attacked ? "true" : "false");
 		str += "\natk {\n";

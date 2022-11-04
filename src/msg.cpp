@@ -1,9 +1,11 @@
 #include <iostream>
+#include <iterator>
 #include <fstream>
 #include <string>
 #include <sstream>
 #include <map>
 #include <vector>
+#include <string.h>
 
 #include <msg.hpp>
 #include <server.hpp>
