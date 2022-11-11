@@ -24,7 +24,7 @@ int main() {
 	temp->p = p2;
 	clients.push_back(temp);
 	int id = 4;
-	str = convert_msg_to_print(create_message(MSG_GET_PLAYER_INFO_R, temp->p));
+	str = convert_msg_to_print(create_message(MSG_GET_PLAYER_BOARD_R, p2));
 	print_msg(str, file);
 	return 0;
 }

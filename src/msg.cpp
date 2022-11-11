@@ -238,9 +238,9 @@ void print_msg(string &msg, std::ofstream &out) {
 	out << msg << "\n";
 }
 
-// ---------------------------------------------------- \\
-//                     MSG CREATION                     \\
-// ---------------------------------------------------- \\
+// ----------------------------------------------------
+//                     MSG CREATION                    
+// ----------------------------------------------------
 
 static void create_get_own_id_req(string &str) {
 	init_msg(str, MSG_GET_OWN_ID_S, MSG_REQUEST);
@@ -298,6 +298,32 @@ static void create_get_player_info_rsp(string &str, Player *p) {
 	close_msg(str);
 }
 
+static void create_get_player_board_req(string &str, int *id) {
+	init_msg(str, MSG_GET_PLAYER_BOARD_S, MSG_REQUEST);
+	add_item(str, "id", *id);
+	close_msg(str);
+}
+
+static void create_get_player_board_rsp(string &str, Player *p) {
+	init_msg(str, MSG_GET_PLAYER_BOARD_R, MSG_RESPONSE);
+	add_item(str, "id", p->get_id());
+	add_item(str, "board", p->get_board()->get_board(), BOARD_SIZE, BOARD_SIZE);
+	close_msg(str);
+}
+
+static void create_can_attack_req(string &str, int *id) {
+	init_msg(str, MSG_CAN_ATTACK_S, MSG_REQUEST);
+	add_item(str, "id", *id);
+	close_msg(str);
+}
+
+static void create_can_attack_rsp(string &str, Player *p) {
+	init_msg(str, MSG_CAN_ATTACK_R, MSG_RESPONSE);
+	add_item(str, "id", p->get_id());
+	add_item(str, "can_attack", p->his_turn());
+	close_msg(str);
+}
+
 string create_message(enum msg_type_e type, void *ptr) {
 	string str;
 	switch (type) {
@@ -323,13 +349,17 @@ string create_message(enum msg_type_e type, void *ptr) {
 			break;
 
 		case MSG_GET_PLAYER_BOARD_S:
+			create_get_player_board_req(str, (int*)ptr);
 			break;
 		case MSG_GET_PLAYER_BOARD_R:
+			create_get_player_board_rsp(str, (Player*)ptr);
 			break;
 
 		case MSG_CAN_ATTACK_S:
+			create_can_attack_req(str, (int*)ptr);
 			break;
 		case MSG_CAN_ATTACK_R:
+			create_can_attack_rsp(str, (Player*)ptr);
 			break;
 
 		case MSG_ATTACK_PLAYER_S:
@@ -378,9 +408,9 @@ string create_message(enum msg_type_e type) {
 	return create_message(type, NULL);
 }
 
-// ---------------------------------------------------- \\
-//                      MSG PARSING                     \\
-// ---------------------------------------------------- \\
+// ----------------------------------------------------
+//                      MSG PARSING                     
+// ----------------------------------------------------
 
 void parse_message(string &str, void *ptr) {
 	// ...

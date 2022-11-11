@@ -143,7 +143,8 @@ field `status` will be `1` (true) or `0` (false)
 Format:
 ```
 {=sMSG_ATTACK_PLAYER
-id(1){[<player_id>]}
+attacker(1){[<player_id>]}
+defender(1){[<player_id>]}
 x(1){[<board_x>]}
 y(1){[<board_y>]}}
 ```
@@ -153,6 +154,7 @@ Response:
 id(1){[<player_id>]}
 status(1){[<status>]}
 ```
+ID value: `attacker`
 Status values: `hit` | `not_hit` | `sunk`
 ### MSG_FORFEIT
 Format:
