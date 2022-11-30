@@ -15,7 +15,7 @@ class Player {
 		std::vector<struct attacked_player> attacks;
 		bool can_attack;
 
-		Match *match;
+		enum game_difficulty_e diff;
 
 		Board *b;
 		int missed_shots;
@@ -26,13 +26,15 @@ class Player {
 		bool winner;
 		bool loser;
 
+		bool host;
+
 		inline static int id;
 
 		struct attacked_player *get_attack_by_id(int id);
 	
 	public:
-		Player(Match *m);
-		Player(Match *m, string name);
+		Player(enum game_difficulty_e e);
+		Player(enum game_difficulty_e e, string name);
 		~Player();
 
 		static void set_id(int start);
@@ -66,6 +68,8 @@ class Player {
 		void set_ai(bool state);
 		void ai_attack(Player &p);
 		void reset_ai_atk(Player &p);
+
+		bool is_host();
 
 		string get_info();
 		string attacks_to_string();

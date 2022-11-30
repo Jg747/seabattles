@@ -1,6 +1,5 @@
 #include <player.hpp>
 #include <common.hpp>
-#include <match.hpp>
 #include <board.hpp>
 #include <debug.hpp>
 
@@ -8,7 +7,7 @@ void Player::set_id(int start) {
 	Player::id = start;
 }
 
-Player::Player(Match *m) {
+Player::Player(enum game_difficulty_e e) {
 	b = new Board();
 	missed_shots = 0;
 	hit_shots = 0;
@@ -20,10 +19,11 @@ Player::Player(Match *m) {
 	Player::id++;
 	sunk_ships = 0;
 	own_sunk_ships = 0;
-	match = m;
+	diff = e;
+	host = false;
 }
 
-Player::Player(Match *m, string name) {
+Player::Player(enum game_difficulty_e e, string name) {
 	b = new Board();
 	missed_shots = 0;
 	hit_shots = 0;
@@ -35,7 +35,8 @@ Player::Player(Match *m, string name) {
 	ai = false;
 	sunk_ships = 0;
 	own_sunk_ships = 0;
-	match = m;
+	diff = e;
+	host = false;
 
 	this->name = name;
 }
@@ -131,7 +132,7 @@ void Player::ai_attack(Player &p) {
 	int **board = b->get_board();
 	struct ai_last_atk *ai_atk = &get_attack_by_id(p.get_id())->atk;
 
-	switch (match->get_difficulty()) {
+	switch (diff) {
 		case NORMAL:
 			// Completely random
 			do {
@@ -297,7 +298,7 @@ void Player::ai_attack(Player &p) {
 				ships[i]->add_hit();
 				if (ships[i]->is_sunk()) {
 					p.dec_remaining_ships();
-					if (match->get_difficulty() == HARD) {
+					if (diff == HARD) {
 						reset_ai_atk(p);
 					}
 				}
@@ -416,4 +417,8 @@ string Player::get_info() {
 	str += "\nattacks: {\n" + this->attacks_to_string() + "}\n";
 	str += b->get_info();
 	return str;
+}
+
+bool Player::is_host() {
+	return host;
 }

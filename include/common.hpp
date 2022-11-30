@@ -1,7 +1,7 @@
 #ifndef __common_h__
 #define __common_h__
 
-#define SERVER_PORT 10747
+#define SERVER_PORT 42069
 #define SERVER_IP "127.0.0.1"
 
 #define BOARD_SIZE 10
@@ -15,7 +15,7 @@ extern const int ships_len[];
 
 enum gamemode_e {
 	SINGLEPLAYER,
-	MULTYPLAYER
+	MULTIPLAYER
 };
 
 enum ship_e {
@@ -54,12 +54,18 @@ enum command_e {
 };
 
 enum game_status_e {
-	WIN,
-	LOSE,
-	PROGRESS,
-	WAITING,
-	QUITTING,
-	NO_ATK
+	START,
+	RUNNING,
+	END
+};
+
+enum player_status_e {
+	WIN,        // player has won
+	LOSE,       // player has lost
+	WAITING,    // player is waiting (in his board)
+	ATTACKING,  // player is attacking an enemy
+	QUIT,       // player has quit
+	LOOKING     // player is looking enemy board
 };
 
 enum grade_e {

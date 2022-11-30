@@ -8,12 +8,11 @@
 #endif
 
 #include <string>
+#include <thread>
+
+#include <common.hpp>
 
 using std::string;
-
-#include <single_match.hpp>
-#include <multi_match.hpp>
-#include <common.hpp>
 
 #define PERCENT_SEA 75
 
@@ -45,7 +44,10 @@ class Gui {
 		WINDOW *sea[BOARD_SIZE + 1][BOARD_SIZE + 1];
 		WINDOW *actions[2];
 
-		Match *m;
+		Server *server;
+		Client *client;
+		std::thread *client_thread;
+		std::thread *server_thread;
 
 		void del_array_win(WINDOW *array[], int len);
 		void init_gui();

@@ -30,10 +30,6 @@ void Match::set_difficulty(enum game_difficulty_e diff) {
 	this->difficulty = diff;
 }
 
-void Match::reset_match() {
-	this->status = PROGRESS;
-}
-
 void Match::set_mode(enum gamemode_e mode) {
 	this->mode = mode;
 }
@@ -48,4 +44,85 @@ enum game_status_e Match::get_status() {
 
 void Match::set_status(enum game_status_e new_status) {
 	this->status = new_status;
+}
+
+Match::Match() {
+	players = new std::vector<Player*>();
+}
+
+Match::Match(enum gamemode_e e) {
+	players = new std::vector<Player*>();
+	mode = e;
+}
+
+Match::~Match() {
+	for (auto p : *players) {
+		delete p;
+	}
+	delete players;
+}
+
+bool Match::add_player(Player *p) {
+	if (players->size() < MAX_CLIENTS) {
+		players->push_back(p);
+		return true;
+	}
+	return false;
+}
+
+bool Match::remove_player(Player *p) {
+	for (auto c : *players) {
+		if (c == p) {
+			delete c;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Match::remove_player(int id) {
+	for (auto p : *players) {
+		if (id == p->get_id()) {
+			delete p;
+			return true;
+		}
+	}
+	return false;
+}
+
+void Match::start_match() {
+	int rand_x;
+	int rand_y;
+	int rand_r;
+	Board *b;
+	Ship **ships;
+	
+	for (auto p : *players) {
+		for (auto enemy : *players) {
+			if (p != enemy) {
+				p->add_player_to_attack(*enemy);
+			}
+		}
+
+		if (p->is_ai()) {
+			b = p->get_board();
+			ships = b->get_ships();
+			for (int i = 0; i < SHIPS_COUNT; ) {
+				rand_x = (rand() % 10001) / 1000;
+				rand_y = (rand() % 10001) / 1000;
+				rand_r = (rand() % 4001) / 1000;
+				if (Ship::evaluate_pos(rand_x, rand_y, ships[i]->getLen(), (enum rotation_e)rand_r)) {
+					ships[i]->setX(rand_x);
+					ships[i]->setY(rand_y);
+					ships[i]->setRotation((enum rotation_e)rand_r);
+					ships[i]->set_placed(true);
+					if (b->insert_on_board(ships[i])) {
+						i++;
+					}
+				}
+			}
+		}
+	}
+
+	Match::set_time(start_time);
 }

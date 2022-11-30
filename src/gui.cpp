@@ -1,16 +1,18 @@
-#include <gui.hpp>
-#include <lang.hpp>
-#include <debug.hpp>
-
 #include <string>
 #include <cmath>
 #include <unistd.h>
+#include <thread>
+
+#include <gui.hpp>
+#include <lang.hpp>
+#include <debug.hpp>
+#include <server.hpp>
 
 using std::to_string;
 
 Gui::Gui() {
 	init_gui();
-	this->m = NULL;
+	this->server = NULL;
 }
 
 Gui::~Gui() {
@@ -18,8 +20,8 @@ Gui::~Gui() {
 	endwin();
 	del_array_win(game_wrapper, 2);
 	del_array_win(start_menu, 2);
-	if (this->m != NULL) {
-		delete m;
+	if (this->server != NULL) {
+		delete server;
 		del_array_win(sea_border, 2);
 		for (int i = 0; i < BOARD_SIZE + 1; i++) {
 			for (int j = 0; j < BOARD_SIZE + 1; j++) {
@@ -160,40 +162,27 @@ void Gui::mvwrite_on_window(WINDOW *w, int x, int y, string str) {
 }
 
 string Gui::get_input(WINDOW *w) {
-	char buf[256];
-	wgetnstr(w, buf, sizeof(buf));
-	return string(buf);
+	string buf = "";
+	int c;
+	keypad(w, true);
+	while ((c = wgetch(w)) != '\n') {
+		switch (c) {
+			case KEY_BACKSPACE:
+			case '\b':
+			case 127:
+				buf.pop_back();
+				break;
+			default:
+				buf.push_back(c);
+				break;
+		}
+	}
+	keypad(w, false);
+	return buf;
 }
 
 void Gui::get_win_size(WINDOW *w, int &width, int &height) {
 	getmaxyx(w, height, width);
-}
-
-int Gui::game_menu() {
-	int x, y;
-	get_win_size(start_menu[0], x, y);
-	wclear(start_menu[0]);
-	mvwrite_on_window(start_menu[0], x/2 - 2, y/2 - 4, "MENU");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Singleplayer");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Multiplayer");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 + 1, "  Exit");
-	wrefresh(start_menu[0]);
-
-	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 3, ">", true);
-}
-
-int Gui::diff_menu() {
-	int x, y;
-	get_win_size(start_menu[0], x, y);
-	wclear(start_menu[0]);
-	mvwrite_on_window(start_menu[0], x/2 - 8, y/2 - 4, "SELECT DIFFICULTY");
-	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 - 2, "> Normal");
-	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 - 1, "  Hard");
-	mvwrite_on_window(start_menu[0], x/2 - 3, y/2, "  Impossible");
-	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 + 2, "  Back");
-	wrefresh(start_menu[0]);
-
-	return menu_cursor(start_menu[0], x/2 - 3, y/2 - 2, 4, ">", true);
 }
 
 int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool step_last) {
@@ -239,87 +228,6 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 	}
 
 	return select;
-}
-
-void Gui::wait_conn_menu() {
-	// TO-DO
-}
-
-int Gui::multi_menu() {
-	int x, y;
-	get_win_size(start_menu[0], x, y);
-	wclear(start_menu[0]);
-	mvwrite_on_window(start_menu[0], x/2 - 5, y/2 - 4, "MULTIPLAYER");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Host a match");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Join a match");
-	mvwrite_on_window(start_menu[0], x/2 - 7, y/2, "  Back");
-	wrefresh(start_menu[0]);
-
-	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 4, ">", true);
-}
-
-bool Gui::join_menu() {
-	int width, height;
-	get_win_size(start_menu[0], width, height);
-	
-	wclear(start_menu[0]);
-	mvwrite_on_window(start_menu[0], width/2 - 5, height/2 - 4, "MULTIPLAYER");
-	mvwrite_on_window(start_menu[0], width/2 - 6, height/2 - 2, "Enter host IP");
-	mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "> back      join");
-	
-	WINDOW *ip = newwin(3, 24, height/2 + 2, width/2 - 10 < 0 ? 0 : width/2 - 10);
-	box(ip, ACS_VLINE, ACS_HLINE);
-
-	wrefresh(start_menu[0]);
-	wrefresh(ip);
-
-	int car = 0, choice;
-	string str;
-
-	do {
-		while (car != '\n') {
-			keypad(start_menu[0], TRUE);
-			car = wgetch(start_menu[0]);
-			keypad(start_menu[0], FALSE);
-			switch (car) {
-				case KEY_LEFT:
-					mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "> back      join");
-					wrefresh(start_menu[0]);
-					choice = 0;
-					break;
-				case KEY_RIGHT:
-					mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "  back    > join");
-					wrefresh(start_menu[0]);
-					choice = 1;
-					break;
-				case KEY_BACKSPACE:
-					if (!str.empty()) {
-						str.pop_back();
-						mvwprintw(ip, 1, 1, "%s ", str.c_str());
-						wrefresh(ip);
-					}
-					break;
-				default:
-					if ((car >= '0' && car <= '9') || car == '.' || car == ':') {
-						str.push_back(car);
-						mvwprintw(ip, 1, 1, "%s", str.c_str());
-						wrefresh(ip);
-					}
-					break;
-			}
-		}
-
-		if (choice == 0) {
-			return false;
-		}
-
-	} while (!((MultiMatch*)m)->check_connection(str));
-
-	return true;
-}
-
-void Gui::waiting_host() {
-
 }
 
 void Gui::write_fleet_type(string who) {
@@ -435,6 +343,33 @@ void Gui::paint_enemy_sea(Player &p) {
 			blue = !blue;
 		}
 	}
+}
+
+int Gui::game_menu() {
+	int x, y;
+	get_win_size(start_menu[0], x, y);
+	wclear(start_menu[0]);
+	mvwrite_on_window(start_menu[0], x/2 - 2, y/2 - 4, "MENU");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Singleplayer");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Multiplayer");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 + 1, "  Exit");
+	wrefresh(start_menu[0]);
+
+	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 3, ">", true);
+}
+
+int Gui::diff_menu() {
+	int x, y;
+	get_win_size(start_menu[0], x, y);
+	wclear(start_menu[0]);
+	mvwrite_on_window(start_menu[0], x/2 - 8, y/2 - 4, "SELECT DIFFICULTY");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 - 2, "> Normal");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 - 1, "  Hard");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2, "  Impossible");
+	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 + 2, "  Back");
+	wrefresh(start_menu[0]);
+
+	return menu_cursor(start_menu[0], x/2 - 3, y/2 - 2, 4, ">", true);
 }
 
 void Gui::paint_actions_menu(enum action_e a, int &width, int &height) {
@@ -799,10 +734,8 @@ enum game_status_e Gui::make_actions(Player &attacker, Player &defender) {
 }
 
 bool Gui::singleplayer() {
-	Match::set_time(m->start_time);
-
-	SingleMatch *m = (SingleMatch*)this->m;
-	m->generate_match();
+	Match *m = server->get_match();
+	m->start_match(); // msg_start_match
 	
 	Player *p = m->get_player();
 	Player *ai = m->get_ai();
@@ -857,7 +790,9 @@ bool Gui::singleplayer() {
 	return true;
 }
 
-bool Gui::start() {
+bool Gui::start() {Match *get_match();
+	RIFARE TUTTO VA LA
+
 	box(start_menu[1], ACS_VLINE, ACS_HLINE);
 	wrefresh(start_menu[1]);
 	wrefresh(start_menu[0]);
@@ -869,21 +804,25 @@ bool Gui::start() {
 		return false;
 	}
 	
-	switch (choice) {
-		case SINGLEPLAYER:
-			break;
-		case MULTYPLAYER:
-			break;
-	}
 	if (choice == SINGLEPLAYER) {
 		diff = diff_menu();
 		if (diff == 3) {
 			return true;
 		}
+		
+		if (server_thread == NULL) {
+			if (this->server == NULL) {
+				server = new Server(SERVER_PORT);
+			}
+			server_thread = new std::thread(thread_server, this->server);
+		}
 	} else {
+		/*
 		diff = multi_menu();
 		switch (diff) {
 			case 0:
+				// ask what port user wants to use for server
+				// check if another server is active, stop it
 				wait_conn_menu();
 				break;
 			case 1:
@@ -896,27 +835,125 @@ bool Gui::start() {
 			case 2:
 				return true;
 				break;
-		}
+		}*/
 	}
 
 	init_game_windows();
 
 	switch (choice) {
 		case SINGLEPLAYER:
-			if (m == NULL) {
-				m = new SingleMatch((enum game_difficulty_e)diff);
-			} else {
-				m->reset_match();
-			}
+			//----------------------------------
+			/*
+			tutti i "messaggi" da inviare al server via
+			rete verranno segnalati, fino a quando non
+			sono stati creati utilizzo le funzioni
+			direttamente in singleplayer!
+			*/
+			server->create_match(); // create_match_msg
+			Match *m = server->get_match();
+
+			// init_match (gamemode + difficulty)
 			m->set_mode((enum gamemode_e)choice);
 			m->set_difficulty((enum game_difficulty_e)diff);
-			m->set_status(PROGRESS);
-			return singleplayer();
+			m->set_status(START);
+			//----------------------------------
+
+			if (!singleplayer()) {
+				server->stop();
+				server_thread = NULL;
+				return false;
+			}
 			break;
-		case MULTYPLAYER:
+		case MULTIPLAYER:
 			// TO-DO
 			break;
 	}
 
+	server_thread = NULL;
+
 	return true;
+}
+
+/************************************************/
+/*                 SERVER MENUS                 */
+/************************************************/
+void Gui::wait_conn_menu() {
+	// TO-DO
+}
+
+int Gui::multi_menu() {
+	int x, y;
+	get_win_size(start_menu[0], x, y);
+	wclear(start_menu[0]);
+	mvwrite_on_window(start_menu[0], x/2 - 5, y/2 - 4, "MULTIPLAYER");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 2, "> Host a match");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Join a match");
+	mvwrite_on_window(start_menu[0], x/2 - 7, y/2, "  Back");
+	wrefresh(start_menu[0]);
+
+	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 4, ">", true);
+}
+
+bool Gui::join_menu() {
+	/*int width, height;
+	get_win_size(start_menu[0], width, height);
+	
+	wclear(start_menu[0]);
+	mvwrite_on_window(start_menu[0], width/2 - 5, height/2 - 4, "MULTIPLAYER");
+	mvwrite_on_window(start_menu[0], width/2 - 6, height/2 - 2, "Enter host IP");
+	mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "> back      join");
+	
+	WINDOW *ip = newwin(3, 24, height/2 + 2, width/2 - 10 < 0 ? 0 : width/2 - 10);
+	box(ip, ACS_VLINE, ACS_HLINE);
+
+	wrefresh(start_menu[0]);
+	wrefresh(ip);
+
+	int car = 0, choice;
+	string str;
+
+	do {
+		while (car != '\n') {
+			keypad(start_menu[0], TRUE);
+			car = wgetch(start_menu[0]);
+			keypad(start_menu[0], FALSE);
+			switch (car) {
+				case KEY_LEFT:
+					mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "> back      join");
+					wrefresh(start_menu[0]);
+					choice = 0;
+					break;
+				case KEY_RIGHT:
+					mvwrite_on_window(start_menu[0], width/2 - 8, height/2 + 4, "  back    > join");
+					wrefresh(start_menu[0]);
+					choice = 1;
+					break;
+				case KEY_BACKSPACE:
+					if (!str.empty()) {
+						str.pop_back();
+						mvwprintw(ip, 1, 1, "%s ", str.c_str());
+						wrefresh(ip);
+					}
+					break;
+				default:
+					if ((car >= '0' && car <= '9') || car == '.' || car == ':') {
+						str.push_back(car);
+						mvwprintw(ip, 1, 1, "%s", str.c_str());
+						wrefresh(ip);
+					}
+					break;
+			}
+		}
+
+		if (choice == 0) {
+			return false;
+		}
+
+	} while (!((MultiMatch*)m)->check_connection(str));
+
+	return true;*/
+}
+
+void Gui::waiting_host() {
+
 }

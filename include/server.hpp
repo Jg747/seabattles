@@ -15,6 +15,7 @@
 #endif
 
 #include <player.hpp>
+#include <match.hpp>
 
 #define MAX_CLIENTS 8
 
@@ -32,29 +33,35 @@ class Server {
 	private:
 		int server_socket;
 
-		std::vector<struct client*> clients;
+		std::vector<struct client*> *clients;
+		Match *m;
+		bool stop_serv;
 		
 		#ifdef _WIN32
 		// WINSOCK
 		#else
-		struct sockaddr_in server_addr;
-		struct sockaddr_in in_addr;
-		socklen_t in_addr_size;
-		struct fd_set sock_list;
+		fd_set sock_list;
 		#endif
 
 		bool add_new_client();
 		bool handle_client_request(struct client *c);
 		void reset_fd_set();
+		string get_current_ip_address();
+
+		void create_match();
+		Match *get_match();
 
 	public:	
 		struct server_error error;
 
-		Server();
+		Server(int port);
 		~Server();
 
 		bool start();
 		void stop();
+		void reset();
 };
+
+void thread_server(int port);
 
 #endif

@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 
+#include <server.hpp>
+
 using std::string;
 
 class Match {
@@ -14,12 +16,26 @@ class Match {
 		enum game_difficulty_e difficulty;
 		enum game_status_e status;
 
+		Server *serv;
+		std::vector<Player*> *players;
+		int player_eliminations;
+
 	public:
 		time_t start_time;
 		time_t end_time;
 
+		Match();
+		Match(enum gamemode_e e);
+		~Match();
+
+		bool add_player(Player *p);
+		bool remove_player(Player *p);
+		bool remove_player(int id);
+
 		static void set_time(time_t &time);
 		string get_duration();
+
+		void start_match();
 
 		void set_mode(enum gamemode_e mode);
 		enum gamemode_e get_mode();
