@@ -120,11 +120,11 @@ int Ship::place_ship(enum command_e cmd) {
 	return 0;
 }
 
-int Ship::getX() {
+int Ship::get_x() {
 	return (int)this->pos_x;
 }
 
-int Ship::getY() {
+int Ship::get_y() {
 	return (int)this->pos_y;
 }
 
@@ -132,11 +132,15 @@ bool Ship::is_placed() {
 	return this->isPlaced;
 }
 
-int Ship::getLen() {
+int Ship::get_len() {
 	return this->length;
 }
 
-enum rotation_e Ship::getRotation() {
+enum ship_e Ship::get_type() {
+	return this->type;
+}
+
+enum rotation_e Ship::get_rotation() {
 	return this->rotation;
 }
 
@@ -182,15 +186,15 @@ bool Ship::evaluate_pos(int x, int y, int len, enum rotation_e rotate) {
 	return evaluate;
 }
 
-void Ship::setX(int x) {
+void Ship::set_x(int x) {
 	this->pos_x = x;
 }
 
-void Ship::setY(int y) {
+void Ship::set_y(int y) {
 	this->pos_y = y;
 }
 
-void Ship::setRotation(enum rotation_e r) {
+void Ship::set_rotation(enum rotation_e r) {
 	this->rotation = r;
 }
 

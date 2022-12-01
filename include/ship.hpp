@@ -28,17 +28,18 @@ class Ship {
 		void add_hit();
 		void reset_hits();
 
-		int getX();
-		int getY();
+		int get_x();
+		int get_y();
 		bool is_placed();
-		int getLen();
-		enum rotation_e getRotation();
+		int get_len();
+		enum ship_e get_type();
+		enum rotation_e get_rotation();
 		int get_id();
 		void set_id(int id);
 		void set_placed(bool state);
-		void setX(int x);
-		void setY(int y);
-		void setRotation(enum rotation_e r);
+		void set_x(int x);
+		void set_y(int y);
+		void set_rotation(enum rotation_e r);
 		bool is_sunk();
 		int taken_hits();
 		string pos_to_string();

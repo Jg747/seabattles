@@ -97,4 +97,21 @@ struct attacked_player {
 	struct ai_last_atk atk;
 };
 
+struct player_info {
+	std::string name;
+	int player_id;
+};
+
+enum attack_status_e {
+	FAILED_ATTACK,
+	MISSED,
+	HIT,
+	HIT_SUNK,
+
+	NOT_YOUR_TURN,
+	NOT_SAME_PLAYER,
+	DEAD_CANNOT_ATTACK,
+	INVALID_ATTACK
+};
+
 #endif

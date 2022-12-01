@@ -1,6 +1,7 @@
 #ifndef __player_h__
 #define __player_h__
 
+#include <common.hpp>
 #include <board.hpp>
 #include <match.hpp>
 
@@ -8,8 +9,7 @@
 
 class Player {
 	protected:
-		string name;
-		int player_id;
+		struct player_info name;		
 		bool ai;
 		std::vector<struct attacked_player> attacks;
 		bool can_attack;

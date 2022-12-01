@@ -30,31 +30,25 @@
 	<data>
 		<data_name>value</data_name>
 		<data_name>
-			<row>
-				<col>data</col>
-			</row>
-			<row>
-				<col>data</col>
-			</row>
-			<row>
-				<col>data</col>
-			</row>
+			<element>data</element>
+			<element>data</element>
+			<element>data</element>
 		</data_name>
 		<data_name>
 			<row>
-				<col>data</col>
-				<col>data</col>
-				<col>data</col>
+				<element>data</element>
+				<element>data</element>
+				<element>data</element>
 			</row>
 			<row>
-				<col>data</col>
-				<col>data</col>
-				<col>data</col>
+				<element>data</element>
+				<element>data</element>
+				<element>data</element>
 			</row>
 			<row>
-				<col>data</col>
-				<col>data</col>
-				<col>data</col>
+				<element>data</element>
+				<element>data</element>
+				<element>data</element>
 			</row>
 		</data_name>
 	</data>
@@ -269,8 +263,8 @@ Format:
 <message>
 	<type>ack</type>
 	<data>
-		<id>{id}</id>
 		<acktype>MSG_MATCH_PLAYER_ID</acktype>
+		<id>{id}</id>
 	</data>
 </message>
 ```
@@ -319,7 +313,7 @@ Inviato al client dopo aver ricevuto un `MSG_PLAYER_ATTACK` valido
 - `HIT` in caso si abbia colpito una nave
 - `HIT_SUNK` in caso si abbia colpito e affondato una nave
 ### ACK[MSG_MATCH_ATTACK_ERR]
-Inviato al client dopo aver ricevuto un `MSG_MATCH_ATTACK_ERR` non valido
+Inviato al client dopo aver ricevuto un `MSG_PLAYER_ATTACK` non valido
 ```
 <message>
 	<type>ack</type>
@@ -344,8 +338,8 @@ Format:
 	<type>ack</type>
 	<data>
 		<id>{id}</id>
-		<player>{id}</player>
 		<acktype>MSG_GET_BOARD</acktype>
+		<player>{id}</player>
 		<board>
 			<row>
 				<color>{color}</cololor>
@@ -375,8 +369,8 @@ Format:
 	<type>ack</type>
 	<data>
 		<id>{id}</id>
-		<player>{id}</player>
 		<acktype>MSG_GET_BOARD_LOST</acktype>
+		<player>{id}</player>
 		<board>
 			<row>
 				<color>{color}</cololor>
@@ -630,3 +624,24 @@ Format:
 ```
 `reason` corrisponde al messaggio del kick (scritto dall'host quando intende kickare il client)
 Risposta: `ACK`
+
+## GENERICI
+### ACK
+In caso sia una risposta di ricezione corretta del messaggio si invia un `ACK generico`
+Format:
+```
+<message>
+	<type>ack</type>
+	<data>
+		<acktype>GENERIC</acktype>
+	</data>
+</message>
+```
+### NAK
+In caso di errore nel parsing verrà inviato il messaggio `NAK`
+Format:
+```
+<message>
+	<type>nak</type>
+</message>
+```
