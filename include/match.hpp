@@ -1,12 +1,12 @@
 #ifndef __match_h__
 #define __match_h__
 
-#include <common.hpp>
-
 #include <vector>
 #include <string>
 
 #include <server.hpp>
+#include <common.hpp>
+#include <player.hpp>
 
 using std::string;
 

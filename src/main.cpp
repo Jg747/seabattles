@@ -1,11 +1,11 @@
-#include <gui.hpp>
+//#include <gui.hpp>
 #include <debug.hpp>
 #include <player.hpp>
 
 #include <chrono>
 
 int main(int argc, char *argv[]) {
-	bool debug = true;
+	/*bool debug = true;
 	
 	time_t seed = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	srand(time(&seed));
@@ -22,5 +22,5 @@ int main(int argc, char *argv[]) {
 		STOP_DEBUG();
 	}
     
-	return 0;
+	return 0;*/
 }

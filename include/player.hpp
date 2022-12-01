@@ -1,7 +1,6 @@
 #ifndef __player_h__
 #define __player_h__
 
-#include <player.hpp>
 #include <board.hpp>
 #include <match.hpp>
 

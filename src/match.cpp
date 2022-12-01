@@ -1,6 +1,7 @@
 #include <match.hpp>
 #include <common.hpp>
 #include <debug.hpp>
+#include <player.hpp>
 
 #include <iostream>
 #include <chrono>
