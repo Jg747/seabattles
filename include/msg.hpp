@@ -199,6 +199,5 @@ typedef struct msg msg_creation, msg_parsing;
 std::string create_message(enum msg_type_e type);
 std::string create_message(enum msg_type_e type, msg_creation *msg);
 void parse_message(std::string &xml_message, msg_parsing *msg);
-enum msg_type_e get_msg_type(pugi::xml_document &doc);
 
 #endif
