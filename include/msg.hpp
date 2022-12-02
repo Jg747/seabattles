@@ -82,6 +82,8 @@ struct match_stats_t {
 	struct stats_t info;
 };
 
+typedef struct player_info ack_generic;
+
 struct player_get_own_id {
 	std::string username;
 };
@@ -161,6 +163,8 @@ struct msg {
 	enum msg_type_e msg_type;
 
 	union {
+		ack_generic ack;
+
 		struct player_get_own_id player_get_own_id;
 		struct player_ship_placement player_ship_placement;
 		struct player_get_board player_get_board;

@@ -14,6 +14,8 @@
 #include <board.hpp>
 #include <ship.hpp>
 
+#define AS_INT(value) strtol(value, NULL, 10);
+
 const char *MSG_TYPE_STR[] = {
 	// Generici
 	"GENERIC",
@@ -177,7 +179,7 @@ static void append_board(pugi::xml_node &data, struct board_t *board) {
 	}
 }
 
-static void append_list(pugi::xml_node &data, struct c_msg_player_list *player_list) {
+static void append_list(pugi::xml_node &data, struct msg_player_list *player_list) {
 	pugi::xml_node list = data.append_child("playerlist");
 	for (auto p : player_list->array) {
 		pugi::xml_node player = list.append_child("player");
@@ -199,8 +201,9 @@ static void create_ack_node(pugi::xml_node &data, enum msg_type_e type) {
 	add_node(data, "acktype", MSG_TYPE_STR[type]);
 }
 
-static void create_ack(pugi::xml_document &doc) {
+static void create_ack(pugi::xml_document &doc, msg_creation *msg) {
 	pugi::xml_node data = get_data_node(doc);
+	add_node(data, "id", msg->data.ack.player_id);
 	create_ack_node(data, ACK);
 }
 
@@ -381,7 +384,7 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 
 	switch (type) {
 		case ACK:
-			create_ack(doc);
+			create_ack(doc, msg);
 			break;
 		
 		case MSG_CONN_ACCEPTED:
@@ -478,14 +481,14 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 }
 
 std::string create_message(enum msg_type_e type) {
-	return create_message(type, NULL, ack_id);
+	return create_message(type, NULL);
 }
 
 // ----------------------------------------------------
 //                      MSG PARSING                     
 // ----------------------------------------------------
 
-enum msg_type_e get_msg_type(pugi::xml_document &doc) {
+static enum msg_type_e get_msg_type(pugi::xml_document &doc) {
 	pugi::xml_node type = doc.child("message").child("type");
 	std::string msg_type = type.value();
 	if (msg_type != "ack") {
@@ -497,6 +500,21 @@ enum msg_type_e get_msg_type(pugi::xml_document &doc) {
 	}
 }
 
+static void get_board(pugi::xml_node &data, struct ack_get_board *board) {
+	size_t i = 0, j;
+	for (pugi::xml_node row = data.child("board").first_child("row"); row; row = data.child("board").next_sibling("row"), i++) {
+		j = 0;
+		for (pugi::xml_node value = row.first_child("color"); value; value = row.next_sibling("color"), j++) {
+			board->matrix[i][j] = value.value();
+		}
+	}
+}
+
+static void parse_ack_generic(pugi::xml_document &doc, msg_creation *msg) {
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.ack.player_id = AS_INT(data.child("id").value());
+}
+
 static void parse_player_get_own_id(pugi::xml_document &doc, msg_parsing *msg) {
 	msg->data.player_get_own_id.username = get_data_node(doc).child("username").value();
 }
@@ -504,97 +522,110 @@ static void parse_player_get_own_id(pugi::xml_document &doc, msg_parsing *msg) {
 static void parse_player_ship_placement(pugi::xml_document &doc, msg_parsing *msg) {
 	pugi::xml_node data = get_data_node(doc);
 	size_t i = 0;
-	for (pugi::xml_node ship_node = data.first_child(); ship_node; ship_node = data.next_sibling(), i++) {
+	for (pugi::xml_node ship_node = data.first_child("ship"); ship_node; ship_node = data.next_sibling("ship"), i++) {
 		struct ship_t *ship = &msg->data.player_ship_placement.array[i];
-		ship->type = (enum ship_e)strtol(ship_node.child("type").value(), NULL, 10);
-		ship->x = (int)strtol(ship_node.child("x").value(), NULL, 10);
-		ship->y = (int)strtol(ship_node.child("y").value(), NULL, 10);
-		ship->rotation = (enum rotation_e)strtol(ship_node.child("orientation").value(), NULL, 10);
+		ship->type = (enum ship_e)AS_INT(ship_node.child("type").value());
+		ship->x = AS_INT(ship_node.child("x").value());
+		ship->y = AS_INT(ship_node.child("y").value())
+		ship->rotation = (enum rotation_e)AS_INT(ship_node.child("orientation").value());
 	}
 }
 
 static void parse_player_get_board(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.player_get_board.id = AS_INT(data.child("id").value());
 }
 
 static void parse_player_get_board_lost(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.player_get_board_lost.id = AS_INT(data.child("id").value());
 }
 
 static void parse_player_attack(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.player_attack.player.player_id = AS_INT(data.child("id").value());
+	msg->data.player_attack.x = AS_INT(data.child("x").value());
+	msg->data.player_attack.y = AS_INT(data.child("y").value());
 }
 
 static void parse_host_player_kick(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.host_player_kick.player.player_id = AS_INT(data.child("id").value());
+	msg->data.host_player_kick.message = data.child("msg").value();
 }
 
 static void parse_ack_player_get_own_id(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.ack_player_get_own_id.player_id = AS_INT(data.child("id").value());
 }
 
 static void parse_ack_match_attack_status(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.ack_match_attack_status.player.player_id = AS_INT(data.child("id").value());
+	msg->data.ack_match_attack_status.status = (enum attack_status_e)AS_INT(doc.child("status").value());
 }
 
 static void parse_ack_get_board(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.ack_get_board.client.player_id = AS_INT(data.child("id").value());
+	msg->data.ack_get_board.player.player_id = AS_INT(data.child("player").value());
+	get_board(data, &msg->data.ack_get_board);
 }
 
 static void parse_ack_get_board_lost(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_ack_match_end(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_ack_invalid_ship_placement(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_ack_match_attack_err(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_ack_match_not_host(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_ack_match_not_dead(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_player_list(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_match_player_removed(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_match_all_placed(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_match_new_board(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_match_win(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_match_lose(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_match_end(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 static void parse_match_got_kicked(pugi::xml_document &doc, msg_parsing *msg) {
-	
+	pugi::xml_node data = get_data_node(doc);
 }
 
 void parse_message(std::string &xml_message, msg_parsing *msg) {
@@ -602,7 +633,11 @@ void parse_message(std::string &xml_message, msg_parsing *msg) {
 	doc.load_string(xml_message.c_str());
 	msg->msg_type = get_msg_type(doc);
 
-	switch (msg->msg_type) {		
+	switch (msg->msg_type) {	
+		case ACK:
+			parse_ack_generic(doc, msg);
+			break;
+			
 		case MSG_PLAYER_GET_OWN_ID:
 			parse_player_get_own_id(doc, msg);
 			break;
