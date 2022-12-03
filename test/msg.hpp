@@ -86,23 +86,14 @@ typedef struct player_info ack_generic_t;
 
 struct player_get_own_id {
 	std::string username;
-
-	player_get_own_id();
-	~player_get_own_id();
 };
 
 struct player_ship_placement {
 	struct ship_t array[SHIPS_COUNT];
-
-	player_ship_placement();
-	~player_ship_placement();
 };
 
 struct player_get_board {
 	int id;
-
-	player_get_board();
-	~player_get_board();
 };
 
 struct player_attack {
@@ -168,7 +159,7 @@ struct match_got_kicked {
 	std::string reason;
 };
 
-union data_union {
+struct data_union {
 	ack_generic_t ack;
 
 	struct player_get_own_id player_get_own_id;
@@ -197,17 +188,11 @@ union data_union {
 	match_lose_t match_lose;
 	match_end_t match_end;
 	struct match_got_kicked match_got_kicked;
-
-	data_union();
-	~data_union();
 };
 
 struct msg {
-	msg();
-	~msg();
-
 	enum msg_type_e msg_type;
-	union data_union data;
+	struct data_union data;
 };
 
 typedef struct msg msg_creation, msg_parsing;

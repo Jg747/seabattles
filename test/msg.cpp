@@ -7,8 +7,8 @@
 #include <vector>
 #include <string.h>
 
-#include <pugi/pugixml.hpp>
-#include <msg.hpp>
+#include "pugi/pugixml.hpp"
+#include "msg.hpp"
 
 #define AS_INT(value) strtol(value, NULL, 10);
 
@@ -105,7 +105,7 @@ static pugi::xml_document init_msg(enum msg_type_e type) {
 	pugi::xml_document doc;
 	pugi::xml_node msg = doc.append_child("message");
 	pugi::xml_node msg_type = msg.append_child("type");
-	msg_type.append_child(pugi::node_pcdata).set_value(type != ACK ? MSG_TYPE_STR[type] : "ack");
+	msg_type.append_child(pugi::node_pcdata).set_value(type == ACK || (type >= 14 && type <= 22) || (type >= 2 && type <= 5) ? "ack" : MSG_TYPE_STR[type]);
 	return doc;
 }
 
@@ -377,7 +377,7 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 		msg->msg_type = type;
 	}
 	pugi::xml_document doc = init_msg(type);
-
+	
 	switch (type) {
 		case ACK:
 			create_ack(doc, msg);
