@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <string.h>
+#include <time.h>
+#include <stdlib.h>
 
 #include "msg.hpp"
 
@@ -17,17 +19,24 @@ static int get_enum(std::string str, const char *arr[], size_t len) {
 }
 
 int main() {
+	srand(time(NULL));
+
 	msg_creation c;
 	msg_parsing p;
 
-	c.data.player_get_own_id.username = "Jg_747";
+	struct data_union *data = &c.data;
+	struct data_union *pdata = &p.data;
 
-	string str = create_message(MSG_PLAYER_GET_OWN_ID, &c);
+	data->ack.player_id = -1;
+
+	string str = create_message(NAK, &c);
 	cout << "msg:\n" << str << "\n\n\n";
 	parse_message(str, &p);
 
-	cout << p.msg_type;
 	cout << MSG_TYPE_STR[p.msg_type] << " | DATA:\n";
-	cout << p.data.player_get_own_id.username;
+
+	cout << pdata->ack.player_id;
+
+	cout << "\n";
 	return 0;
 }

@@ -480,7 +480,7 @@ Inviato dal server al client quando cambia la situazione nella board di quel pla
 Format:
 ```
 <message>
-	<type>MSG_MATCH_GET_BOARD</type>
+	<type>MSG_MATCH_NEW_BOARD</type>
 	<data>
 		<id>{id}</id>
 		<attacker>{username}</attacker>
@@ -633,10 +633,12 @@ Format:
 <message>
 	<type>ack</type>
 	<data>
+		<id>{id}</id>
 		<acktype>GENERIC</acktype>
 	</data>
 </message>
 ```
+`id` è l'ID del giocatore a cui è destinato il pacchetto, in caso sia un ACK generico avrà il valore `-1`
 ### NAK
 In caso di errore nel parsing verrà inviato il messaggio `NAK`
 Format:
