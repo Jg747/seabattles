@@ -21,29 +21,7 @@ is going to be your server
 #include <debug.hpp>
 
 #ifdef _WIN32
-Server::Server() {
-	
-}
-
-Server::~Server() {
-	
-}
-
-void Server::reset_fd_set() {
-	
-}
-
-bool Server::start() {
-	return true;
-}
-
-bool Server::add_new_client() {
-	return true;
-}
-
-bool Server::handle_client_request(struct client *c) {
-	return true;
-}
+// ...
 #else
 Server::Server(int port) {
 	memset(&error, 0, sizeof(error));
@@ -187,8 +165,6 @@ bool Server::handle_client_request(struct client *c) {
 		this->error.error += "- Server::start()::handle_client_request()::recv()\n";
 		return false;
 	}
-
-	enum msg_type_e msg_type = get_msg_type(std::string(buffer));
 
 	return true;
 }

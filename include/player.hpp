@@ -1,11 +1,11 @@
 #ifndef __player_h__
 #define __player_h__
 
+#include <vector>
+
 #include <common.hpp>
 #include <board.hpp>
 #include <match.hpp>
-
-#include <vector>
 
 class Player {
 	protected:
@@ -17,6 +17,7 @@ class Player {
 		enum game_difficulty_e diff;
 
 		Board *b;
+
 		int missed_shots;
 		int hit_shots;
 		int sunk_ships;
@@ -25,6 +26,9 @@ class Player {
 		bool winner;
 		bool loser;
 
+		bool ask_board;
+		int last_x;
+		int last_y;
 		bool host;
 
 		inline static int id;
@@ -32,18 +36,20 @@ class Player {
 		struct attacked_player *get_attack_by_id(int id);
 	
 	public:
-		Player(enum game_difficulty_e e);
-		Player(enum game_difficulty_e e, string name);
+		Player(bool is_host);
 		~Player();
 
-		static void set_id(int start);
+		static void set_id_start(int start);
 
 		Board *get_board();
 		void reset_player();
 		enum grade_e get_grade();
 		string get_name();
 		void set_name(string name);
+		void set_id(int id);
 		int get_id();
+		enum game_difficulty_e get_diff();
+		void set_diff(enum game_difficulty_e diff);
 		void set_can_attack(bool state);
 		bool his_turn();
 		void add_player_to_attack(Player &p);
@@ -62,6 +68,11 @@ class Player {
 		void inc_misses();
 		void inc_sunk_ships();
 
+		void set_ask_board(bool state);
+		bool do_ask_board();
+
+		int *get_last_attack_x();
+		int *get_last_attack_y();
 
 		bool is_ai();
 		void set_ai(bool state);

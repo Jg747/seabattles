@@ -30,6 +30,7 @@ const char *MSG_TYPE_STR[] = {
 	"MSG_PLAYER_QUIT",
 
 	// Host
+	"MSG_HOST_INIT_MATCH",
 	"MSG_HOST_START_MATCH",
 	"MSG_HOST_PLAYER_KICK",
 
@@ -41,6 +42,7 @@ const char *MSG_TYPE_STR[] = {
 	"ACK_MSG_MATCH_END",
 	"ACK_INVALID_SHIP_PLACEMENT",
 	"ACK_MSG_MATCH_ATTACK_ERR",
+	"ACK_MSG_MATCH_INIT_MATCH",
 	"ACK_MSG_MATCH_NOT_HOST",
 	"ACK_MSG_MATCH_NOT_DEAD",
 
@@ -66,6 +68,11 @@ const char *ATTACK_STATUS_STR[] = {
 	"NOT_SAME_PLAYER",
 	"DEAD_CANNOT_ATTACK",
 	"INVALID_ATTACK"
+};
+
+const char *GENERIC_STATUS_STR[] = {
+	"OK",
+	"ERROR"
 };
 
 static int get_enum(std::string str, const char *arr[], size_t len) {
@@ -370,6 +377,19 @@ static void create_match_got_kicked(pugi::xml_document &doc, msg_creation *msg) 
 	add_node(data, "reason", msg->data.match_got_kicked.reason);
 }
 
+static void create_host_init_match(pugi::xml_document &doc, msg_creation *msg) {
+	pugi::xml_node data = get_data_node(doc);
+	add_node(data, "difficulty", (int)msg->data.host_init_match.difficulty);
+	add_node(data, "ai", msg->data.host_init_match.ais);
+}
+
+static void create_ack_match_init_match(pugi::xml_document &doc, msg_creation *msg) {
+	pugi::xml_node data = get_data_node(doc);
+	add_node(data, "id", msg->data.ack_match_init_match.player.player_id);
+	create_ack_node(data, ACK_MSG_MATCH_INIT_MATCH);
+	add_node(data, "status", GENERIC_STATUS_STR[msg->data.ack_match_init_match.status]);
+}
+
 std::string create_message(enum msg_type_e type, msg_creation *msg) {
 	if (msg != NULL) {
 		msg->msg_type = type;
@@ -410,6 +430,9 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 			create_player_attack(doc, msg);
 			break;
 		
+		case MSG_HOST_INIT_MATCH:
+			create_host_init_match(doc, msg);
+			break;
 		case MSG_HOST_PLAYER_KICK:
 			create_host_player_kick(doc, msg);
 			break;
@@ -434,6 +457,9 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 			break;
 		case ACK_MSG_MATCH_ATTACK_ERR:
 			create_ack_match_attack_err(doc, msg);
+			break;
+		case ACK_MSG_MATCH_INIT_MATCH:
+			create_ack_match_init_match(doc, msg);
 			break;
 		case ACK_MSG_MATCH_NOT_HOST:
 			create_ack_match_not_host(doc, msg);
@@ -670,6 +696,18 @@ static void parse_match_got_kicked(pugi::xml_document &doc, msg_parsing *msg) {
 	msg->data.match_got_kicked.reason = data.child("reason").text().as_string();
 }
 
+static void parse_host_init_match(pugi::xml_document &doc, msg_creation *msg) {
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.host_init_match.difficulty = (enum game_difficulty_e)data.child("difficulty").text().as_int();
+	msg->data.host_init_match.ais = data.child("ai").text().as_int();
+}
+
+static void parse_ack_match_init_match(pugi::xml_document &doc, msg_creation *msg) {
+	pugi::xml_node data = get_data_node(doc);
+	msg->data.ack_match_init_match.player.player_id = data.child("id").text().as_int();
+	msg->data.ack_match_init_match.status = (enum generic_status_e)get_enum(data.child("status").text().as_string(), GENERIC_STATUS_STR, GENERIC_STATUS_STR_LEN);
+}
+
 void parse_message(std::string &xml_message, msg_parsing *msg) {
 	pugi::xml_document doc;
 	doc.load_string(xml_message.c_str());
@@ -696,6 +734,9 @@ void parse_message(std::string &xml_message, msg_parsing *msg) {
 			parse_player_attack(doc, msg);
 			break;
 		
+		case MSG_HOST_INIT_MATCH:
+			parse_host_init_match(doc, msg);
+			break;
 		case MSG_HOST_PLAYER_KICK:
 			parse_host_player_kick(doc, msg);
 			break;
@@ -720,6 +761,9 @@ void parse_message(std::string &xml_message, msg_parsing *msg) {
 			break;
 		case ACK_MSG_MATCH_ATTACK_ERR:
 			parse_ack_match_attack_err(doc, msg);
+			break;
+		case ACK_MSG_MATCH_INIT_MATCH:
+			parse_ack_match_init_match(doc, msg);
 			break;
 		case ACK_MSG_MATCH_NOT_HOST:
 			parse_ack_match_not_host(doc, msg);

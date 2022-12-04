@@ -32,6 +32,7 @@ enum msg_type_e {
 	MSG_PLAYER_QUIT,
 
 	// Messaggi dell'HOST
+	MSG_HOST_INIT_MATCH,
 	MSG_HOST_START_MATCH,
 	MSG_HOST_PLAYER_KICK,
 	
@@ -43,6 +44,7 @@ enum msg_type_e {
 	ACK_MSG_MATCH_END,
 	ACK_INVALID_SHIP_PLACEMENT,
 	ACK_MSG_MATCH_ATTACK_ERR,
+	ACK_MSG_MATCH_INIT_MATCH,
 	ACK_MSG_MATCH_NOT_HOST,
 	ACK_MSG_MATCH_NOT_DEAD,
 
@@ -102,6 +104,11 @@ struct player_attack {
 	int y;
 };
 
+struct host_init_match {
+	enum game_difficulty_e difficulty;
+	int ais;
+};
+
 struct host_player_kick {
 	struct player_info player;
 	std::string message;
@@ -127,6 +134,11 @@ typedef struct player_info ack_invalid_ship_placement_t;
 struct ack_match_attack_err {
 	struct player_info player;
 	enum attack_status_e status;
+};
+
+struct ack_match_init_match {
+	struct player_info player;
+	enum generic_status_e status;
 };
 
 typedef struct player_info ack_match_not_host_t;
@@ -168,6 +180,7 @@ struct data_union {
 	struct player_get_board player_get_board_lost;
 	struct player_attack player_attack;
 	
+	struct host_init_match host_init_match;
 	struct host_player_kick host_player_kick;
 		
 	ack_player_get_own_id_t ack_player_get_own_id;
@@ -177,6 +190,7 @@ struct data_union {
 	ack_match_end_t ack_match_end;
 	ack_invalid_ship_placement_t ack_invalid_ship_placement;
 	struct ack_match_attack_err ack_match_attack_err;
+	struct ack_match_init_match ack_match_init_match;
 	ack_match_not_host_t ack_match_not_host;
 	ack_match_not_dead_t ack_match_not_dead;
 	

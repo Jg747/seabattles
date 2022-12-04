@@ -3,42 +3,24 @@
 #include <board.hpp>
 #include <debug.hpp>
 
-void Player::set_id(int start) {
+void Player::set_id_start(int start) {
 	Player::id = start;
 }
 
-Player::Player(enum game_difficulty_e e) {
+Player::Player(bool is_host) {
 	b = new Board();
 	missed_shots = 0;
 	hit_shots = 0;
 	loser = false;
 	winner = false;
 	can_attack = false;
-	player_id = Player::id;
-	ai = false;
-	Player::id++;
-	sunk_ships = 0;
-	own_sunk_ships = 0;
-	diff = e;
-	host = false;
-}
-
-Player::Player(enum game_difficulty_e e, string name) {
-	b = new Board();
-	missed_shots = 0;
-	hit_shots = 0;
-	loser = false;
-	winner = false;
-	can_attack = false;
-	player_id = Player::id;
+	name.player_id = Player::id;
 	Player::id++;
 	ai = false;
 	sunk_ships = 0;
 	own_sunk_ships = 0;
-	diff = e;
-	host = false;
-
-	this->name = name;
+	host = is_host;
+	ask_board = true;
 }
 
 Player::~Player() {
@@ -82,15 +64,43 @@ enum grade_e Player::get_grade() {
 }
 
 string Player::get_name() {
-	return this->name;
+	return this->name.name;
 }
 
 void Player::set_name(string name) {
-	this->name = name;
+	this->name.name = name;
+}
+
+void Player::set_id(int id) {
+	this->name.player_id = id;
 }
 
 int Player::get_id() {
-	return this->player_id;
+	return this->name.player_id;
+}
+
+enum game_difficulty_e Player::get_diff() {
+	return this->diff;
+}
+
+void Player::set_diff(enum game_difficulty_e diff) {
+	this->diff = diff;
+}
+
+void Player::set_ask_board(bool state) {
+	this->ask_board = state;
+}
+
+bool Player::do_ask_board() {
+	return this->ask_board;
+}
+
+int *Player::get_last_attack_x() {
+	return &last_x;
+}
+
+int *Player::get_last_attack_y() {
+	return &last_y;
 }
 
 void Player::set_can_attack(bool state) {
@@ -404,8 +414,8 @@ string Player::attacks_to_string() {
 }
 
 string Player::get_info() {
-	string str = "PLAYER (" + name + ")";
-	str += "\nid: " + std::to_string(player_id);
+	string str = "PLAYER (" + name.name + ")";
+	str += "\nid: " + std::to_string(name.player_id);
 	str += "\nis_ai: " + string(ai ? "true" : "false");
 	str += "\ncan_attack: " + string(can_attack ? "true" : "false");
 	str += "\nmissed_shots: " + std::to_string(missed_shots);

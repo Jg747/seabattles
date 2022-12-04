@@ -213,6 +213,23 @@ Format:
 ```
 Risposta: `ACK[MSG_MATCH_END]`
 ### MESSAGGI HOST
+#### MSG_HOST_INIT_MATCH
+Inviato dal player host per creare un match
+Format:
+```
+<message>
+	<type>MSG_HOST_INIT_MATCH</type>
+	<data>
+		<difficulty>{difficulty}</difficulty>
+		<ai>{number of ai}</ai>
+	</data>
+</message>
+```
+`difficulty` è la difficoltà del match
+`ai` è il numero di AI presente nel match
+Risposta:
+- `ACK[MSG_MATCH_INIT_MATCH]` in caso sia ok
+- `ACK[MSG_MATCH_NOT_HOST]` in caso il client non sia host
 #### MSG_HOST_START_MATCH
 Inviato dal player host per avviare la partita
 Format:
@@ -269,6 +286,23 @@ Format:
 </message>
 ```
 `id` è l'id del giocatore
+### ACK[MSG_MATCH_INIT_MATCH]
+Inviato al client dopo aver ricevuto `MSG_HOST_INIT_MATCH`
+Format:
+```
+<message>
+	<type>ack</type>
+	<data>
+		<id>{id}</id>
+		<acktype>MSG_MATCH_INIT_MATCH</acktype>
+		<status>{status}</status>
+	</data>
+</message>
+```
+`id` è l'id del giocatore
+`status` è lo status della risposta e pul essere:
+- `OK` in caso vada tutto bene
+- `ERROR` in caso i dati forniti non siano validi
 ### ACK[MSG_MATCH_NOT_HOST]
 Inviato al client dopo aver tentato un comando da host, ma questo non lo è
 Format:

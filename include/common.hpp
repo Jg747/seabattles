@@ -6,6 +6,8 @@
 #define SERVER_PORT 42069
 #define SERVER_IP "127.0.0.1"
 
+#define DEFAULT_PLAYER_NAME "player"
+
 #define BOARD_SIZE 10
 
 #define SHIPS_COUNT 5
@@ -14,6 +16,9 @@
 #define DAMAGE 0xFFFFFF
 
 extern const int ships_len[];
+
+extern const char *GENERIC_STATUS_STR[];
+#define GENERIC_STATUS_STR_LEN 2
 
 enum gamemode_e {
 	SINGLEPLAYER,
@@ -114,6 +119,11 @@ enum attack_status_e {
 	NOT_SAME_PLAYER,
 	DEAD_CANNOT_ATTACK,
 	INVALID_ATTACK
+};
+
+enum generic_status_e {
+	GS_OK,
+	GS_ERROR
 };
 
 #endif

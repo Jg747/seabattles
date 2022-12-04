@@ -38,8 +38,8 @@ void Board::reset_board() {
 	this->last_id = 1;
 	assign_ids();
 	for (int i = 0; i < SHIPS_COUNT; i++) {
-		ships[i]->setX(0);
-		ships[i]->setY(BOARD_SIZE - 1);
+		ships[i]->set_x(0);
+		ships[i]->set_y(BOARD_SIZE - 1);
 		ships[i]->reset_hits();
 	}
 	this->ships_remaining = 0;
@@ -77,10 +77,10 @@ bool Board::insert_ship(int index, enum command_e cmd) {
 }
 
 void Board::remove_from_board(Ship *&ship) {
-	enum rotation_e rotation = ship->getRotation();
-	int x = ship->getX();
-	int y = ship->getY();
-	int len = ship->getLen();
+	enum rotation_e rotation = ship->get_rotation();
+	int x = ship->get_x();
+	int y = ship->get_y();
+	int len = ship->get_len();
 
 	switch (rotation) {
 		case UP:
@@ -99,7 +99,7 @@ void Board::remove_from_board(Ship *&ship) {
 			}
 			break;
 		case LEFT:
-			for (int i = x; i > x - ship->getLen(); i--) {
+			for (int i = x; i > x - len; i--) {
 				board[y][i] = 0;
 			}
 			break;
@@ -109,14 +109,14 @@ void Board::remove_from_board(Ship *&ship) {
 
 bool Board::insert_on_board(Ship *&ship) {
 	int counter = 0;
-	switch (ship->getRotation()) {
+	switch (ship->get_rotation()) {
 		case UP:
 			if (!check_intersection(ship)) {
 				ship->set_placed(false);
 				return false;
 			}
-			for (int i = ship->getY(); i > ship->getY() - ship->getLen(); i--, counter++) {
-				board[i][ship->getX()] = ship->get_id() + counter;
+			for (int i = ship->get_x(); i > ship->get_y() - ship->get_len(); i--, counter++) {
+				board[i][ship->get_x()] = ship->get_id() + counter;
 			}
 			break;
 		case RIGHT:
@@ -124,8 +124,8 @@ bool Board::insert_on_board(Ship *&ship) {
 				ship->set_placed(false);
 				return false;
 			}
-			for (int i = ship->getX(); i < ship->getX() + ship->getLen(); i++, counter++) {
-				board[ship->getY()][i] = ship->get_id() + counter;
+			for (int i = ship->get_x(); i < ship->get_x() + ship->get_len(); i++, counter++) {
+				board[ship->get_y()][i] = ship->get_id() + counter;
 			}
 			break;
 		case DOWN:
@@ -133,8 +133,8 @@ bool Board::insert_on_board(Ship *&ship) {
 				ship->set_placed(false);
 				return false;
 			}
-			for (int i = ship->getY(); i < ship->getY() + ship->getLen(); i++, counter++) {
-				board[i][ship->getX()] = ship->get_id() + counter;
+			for (int i = ship->get_y(); i < ship->get_y() + ship->get_len(); i++, counter++) {
+				board[i][ship->get_x()] = ship->get_id() + counter;
 			}
 			break;
 		case LEFT:
@@ -142,8 +142,8 @@ bool Board::insert_on_board(Ship *&ship) {
 				ship->set_placed(false);
 				return false;
 			}
-			for (int i = ship->getX(); i > ship->getX() - ship->getLen(); i--, counter++) {
-				board[ship->getY()][i] = ship->get_id() + counter;
+			for (int i = ship->get_x(); i > ship->get_x() - ship->get_len(); i--, counter++) {
+				board[ship->get_y()][i] = ship->get_id() + counter;
 			}
 			break;
 	}
@@ -152,31 +152,31 @@ bool Board::insert_on_board(Ship *&ship) {
 }
 
 bool Board::check_intersection(Ship *&ship) {
-	switch (ship->getRotation()) {
+	switch (ship->get_rotation()) {
 		case UP:
-			for (int i = ship->getY(); i > ship->getY() - ship->getLen(); i--) {
-				if (board[i][ship->getX()] > 0) {
+			for (int i = ship->get_y(); i > ship->get_y() - ship->get_len(); i--) {
+				if (board[i][ship->get_x()] > 0) {
 					return false;
 				}
 			}
 			break;
 		case RIGHT:
-			for (int i = ship->getX(); i < ship->getX() + ship->getLen(); i++) {
-				if (board[ship->getY()][i] > 0) {
+			for (int i = ship->get_x(); i < ship->get_y() + ship->get_len(); i++) {
+				if (board[ship->get_y()][i] > 0) {
 					return false;
 				}
 			}
 			break;
 		case DOWN:
-			for (int i = ship->getY(); i < ship->getY() + ship->getLen(); i++) {
-				if (board[i][ship->getX()] > 0) {
+			for (int i = ship->get_y(); i < ship->get_y() + ship->get_len(); i++) {
+				if (board[i][ship->get_x()] > 0) {
 					return false;
 				}
 			}
 			break;
 		case LEFT:
-			for (int i = ship->getX(); i > ship->getX() - ship->getLen(); i--) {
-				if (board[ship->getY()][i] > 0) {
+			for (int i = ship->get_x(); i > ship->get_x() - ship->get_len(); i--) {
+				if (board[ship->get_y()][i] > 0) {
 					return false;
 				}
 			}

@@ -278,9 +278,9 @@ string Ship::type_to_string() {
 string Ship::get_info() {
 	string str = "Ship (id: " + to_string(this->get_id()) + ")\n";
 	str += "type: " + this->type_to_string() + "\n";
-	str += "len: " + to_string(this->getLen() + '0') + "\n";
+	str += "len: " + to_string(this->get_len() + '0') + "\n";
 	str += "rotation: " + this->pos_to_string() + "\n";
-	str += "pos: " + to_string(this->getX()) + ", " + to_string(this->getY()) + "\n";
+	str += "pos: " + to_string(this->get_x()) + ", " + to_string(this->get_y()) + "\n";
 	str += "placed: " + string((this->is_placed() ? "true" : "false")) + "\n";
 	str += "hits_taken: " + to_string(this->taken_hits()) + "\n";
 	return str;

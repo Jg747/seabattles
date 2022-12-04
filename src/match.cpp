@@ -1,10 +1,11 @@
+#include <iostream>
+#include <chrono>
+
+#include <server.hpp>
 #include <match.hpp>
 #include <common.hpp>
 #include <debug.hpp>
 #include <player.hpp>
-
-#include <iostream>
-#include <chrono>
 
 using std::to_string;
 using std::string;
@@ -112,10 +113,10 @@ void Match::start_match() {
 				rand_x = (rand() % 10001) / 1000;
 				rand_y = (rand() % 10001) / 1000;
 				rand_r = (rand() % 4001) / 1000;
-				if (Ship::evaluate_pos(rand_x, rand_y, ships[i]->getLen(), (enum rotation_e)rand_r)) {
-					ships[i]->setX(rand_x);
-					ships[i]->setY(rand_y);
-					ships[i]->setRotation((enum rotation_e)rand_r);
+				if (Ship::evaluate_pos(rand_x, rand_y, ships[i]->get_len(), (enum rotation_e)rand_r)) {
+					ships[i]->set_x(rand_x);
+					ships[i]->set_y(rand_y);
+					ships[i]->set_rotation((enum rotation_e)rand_r);
 					ships[i]->set_placed(true);
 					if (b->insert_on_board(ships[i])) {
 						i++;
