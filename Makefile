@@ -106,6 +106,8 @@ endif
 
 clean:
 	$(RM) $(BIN)
+	$(RM) $(EXECUTABLE)
+	$(RM) *.log
 	@echo [Makefile] Done
 
 install:

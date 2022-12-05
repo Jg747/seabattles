@@ -27,6 +27,11 @@ struct client_t {
 struct server_error {
 	bool is_error;
 	std::string error;
+
+	server_error() {
+		is_error = false;
+		error = "";
+	}
 };
 
 class Server {
@@ -60,6 +65,8 @@ class Server {
 		bool start();
 		void stop();
 		void reset();
+
+		bool is_running();
 };
 
 void thread_server(Server *s);

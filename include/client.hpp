@@ -15,6 +15,7 @@ class Client {
         bool stop;
         fd_set fd_list;
         std::string error;
+        msg_parsing r_msg;
 
         Gui *g;
         Server *s;
@@ -24,13 +25,15 @@ class Client {
         bool connect_to_server(std::string ip, int port);
         bool do_from_socket();
 
+        void reset_player_list();
+
     public:
         Client();
         ~Client();
 
         void create_server();
 
-        void start();
+        bool start();
         void send_message(msg_creation *msg);
         void receive_message(msg_parsing *msg);
 };

@@ -24,8 +24,6 @@ is going to be your server
 // ...
 #else
 Server::Server(int port) {
-	memset(&error, 0, sizeof(error));
-
 	if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		error.is_error = true;
 		error.error += "- Server socket creation error\n";
@@ -153,6 +151,10 @@ bool Server::add_new_client() {
 		}
 		return false;
 	}
+}
+
+bool Server::is_running() {
+	return this->stop_serv == false;
 }
 
 bool Server::handle_client_request(struct client_t *c) {

@@ -52,7 +52,7 @@ enum msg_type_e {
 	MSG_PLAYER_LIST,
 	MSG_MATCH_PLAYER_REMOVED,
 	MSG_MATCH_STARTED,
-	MSG_MATCH_ALL_PLACED,
+	MSG_MATCH_TURN,
 	MSG_MATCH_NEW_BOARD,
 	MSG_MATCH_WIN,
 	MSG_MATCH_LOSE,
@@ -77,6 +77,7 @@ struct stats_t {
 	int missed;
 	int sunk_ships;
 	int remaining_ships;
+	std::string duration;
 };
 
 struct match_stats_t {
@@ -155,7 +156,7 @@ struct match_player_removed {
 	struct msg_player_list list;
 };
 
-struct match_all_placed {
+struct match_turn {
 	bool turn;
 };
 
@@ -196,7 +197,7 @@ struct data_union {
 	
 	struct msg_player_list msg_player_list;
 	struct match_player_removed match_player_removed;
-	struct match_all_placed match_all_placed;
+	struct match_turn match_turn;
 	struct match_new_board match_new_board;
 	match_win_t match_win;
 	match_lose_t match_lose;

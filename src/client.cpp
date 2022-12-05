@@ -23,7 +23,7 @@ Client::Client() {
     g = new Gui(this);
     s = NULL;
     t_server = NULL;
-    stop = false;
+    stop = true;
 }
 
 Client::~Client() {
@@ -40,9 +40,12 @@ void Client::reset_fd_set() {
     FD_SET(client_socket, &fd_list);
 }
 
-void Client::start() {
+bool Client::start() {
     if (!g->pregame()) {
-        return;
+        if (s->is_running()) {
+            s->stop();
+        }
+        return false;
     }
 
     do {
@@ -60,6 +63,8 @@ void Client::start() {
             }
         }
     } while (!stop);
+
+    return true;
 }
 
 void Client::create_server() {
@@ -119,7 +124,76 @@ void Client::receive_message(msg_parsing *msg) {
     parse_message(buf_string, msg);
 }
 
+void Client::reset_player_list() {
+    std::map<int, Player*> *list = g->get_player_list();
+    std::map<int, std::string> names;
+    std::map<int, Player*> new_list;
+    
+    for (auto p : r_msg.data.msg_player_list.array) {
+        names.insert({p.player_id, p.name});
+        new_list.insert({p.player_id, NULL});
+    }
+    
+    for (auto p : *list) {
+        if (new_list.contains(p.first)) {
+            new_list[p.first] = p.second;
+        } else {
+            delete p.second;
+        }
+    }
+
+    for (auto p : new_list) {
+        if (p.second == NULL) {
+            p.second = new Player(false);
+            p.second->set_id(p.first);
+            p.second->set_name(names[p.first]);
+        }
+    }
+    
+    g->set_player_list(new_list);
+}
+
 bool Client::do_from_socket() {
-    // socket reading and merdate varie
+    this->receive_message(&this->r_msg);
+
+    switch (r_msg.msg_type) {
+        case MSG_CONN_ERR:
+        case MSG_CONN_SERVER_FULL:
+        case MSG_CONN_MATCH_STARTED:
+            g->conn_err(&this->r_msg);
+            stop = true;
+            break;
+        
+        case MSG_PLAYER_LIST:
+        case MSG_MATCH_PLAYER_REMOVED:
+            reset_player_list();
+            break;
+    
+        case MSG_MATCH_STARTED:
+            g->game_starting();
+            break;
+        case MSG_MATCH_TURN:
+            g->turn(this->r_msg.data.match_turn.turn);
+            break;
+        case MSG_MATCH_NEW_BOARD:
+            g->set_new_board(&this->r_msg);
+            break;
+        
+        case MSG_MATCH_WIN:
+        case MSG_MATCH_LOSE:
+        case MSG_MATCH_END:
+            g->end_game_win(&this->r_msg);
+            stop = true;
+            break;
+
+        case MSG_MATCH_GOT_KICKED:
+            g->got_kicked(&this->r_msg);
+            stop = true;
+            break;
+        
+        default:
+            break;
+    }
+
     return true;
 }

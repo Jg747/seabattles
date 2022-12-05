@@ -7,7 +7,7 @@
 - Quando il match è startato avviso tutti i giocatori che il match è startato (in locale ci pensa la GUI a far piazzare le navi) `[MSG_MATCH_STARTED]` | `ACK`
 - Tutti i giocatori per cazzi loro in locale inseriscono le navi (una volta terminato l'inserimento si bloccano nel loro field e fine)
 - Quando i giocatori confermano il loro piazzamento inviano le coordinate e la direzione delle loro navi in un messaggio `[MSG_PLAYER_SHIP_PLACEMENT (arr[5]=>[type, x, y, orient], ...)]` | `ACK` oppure `ACK [INVALID_SHIP_PLACEMENT]`
-- Una volta che tutti hanno confermato invio a tutti `[MSG_MATCH_ALL_PLACED (your_turn | true o false in base di chi sia il turno)]` | `ACK`
+- Una volta che tutti hanno confermato invio a tutti `[MSG_MATCH_TURN (your_turn | true o false in base di chi sia il turno)]` | `ACK`
 - Il player attacca, prima c'è un `[MSG_PLAYER_GET_BOARD]`, poi un `[MSG_PLAYER_ATTACK (chi, x, y)]` | `ACK [MSG_MATCH_ATTACK_STATUS(attacco fallito, preso niente, colpito, affondato)]` oppure `ACK [MSG_MATCH_ATTACK_ERR(not turn, can't attack same player, dead_cant_attack)]`
    Invio al difensore `[MSG_MATCH_NEW_BOARD]` | `ACK`
 - I vari player possono cercare di voler vedere i vari field nel mentre che attendono quindi scelta del giocatore da 
@@ -446,6 +446,7 @@ Inviato al client dopo aver ricevuto un `MSG_PLAYER_QUIT`
 	<data>
 		<id>{id}</id>
 		<acktype>MSG_MATCH_END</acktype>
+		<duration>{game duration}</duration>
 		<grade>{grade}</grade>
 		<hits>{hits}</hits>
 		<misses>{misses}</misses>
@@ -457,6 +458,7 @@ Inviato al client dopo aver ricevuto un `MSG_PLAYER_QUIT`
 </message>
 ```
 `id` è l'id del giocatore a cui si sta inviando il dato
+`duration` è la lunghezza del game fino a quando non si è usciti
 `grade` è il grado del giocatore alla fine della partita
 `hits` è il numero di di hit effettuate
 `misses` è il numero di miss effettuati
@@ -496,12 +498,14 @@ Format:
 </message>
 ```
 Risposta: `ACK`
-### MSG_MATCH_ALL_PLACED
-Inviato dal server quando è stato ricevuto MSG_PLAYER_SHIP_PLACEMENT (corretto) da tutti i giocatori
+### MSG_MATCH_TURN
+Inviato dal server quando:
+- è iniziato il turno di un giocatore
+- è finito il turno di un giocatore
 Format:
 ```
 <message>
-	<type>MSG_MATCH_ALL_PLACED</type>
+	<type>MSG_MATCH_TURN</type>
 	<data>
 		<turn>{boolean your_turn}</turn>
 	</data>
@@ -548,6 +552,7 @@ Format:
 	<type>MSG_MATCH_WIN</type>
 	<data>
 		<id>{id}</id>
+		<duration>{game duration}</duration>
 		<grade>{grade}</grade>
 		<hits>{hits}</hits>
 		<misses>{misses}</misses>
@@ -559,6 +564,7 @@ Format:
 </message>
 ```
 `id` è l'id del giocatore a cui si sta inviando il dato
+`duration` è la lunghezza del game fino a quando non si è usciti
 `grade` è il grado del giocatore alla fine della partita
 `hits` è il numero di di hit effettuate
 `misses` è il numero di miss effettuati
@@ -573,6 +579,7 @@ Format:
 	<type>MSG_MATCH_LOSE</type>
 	<data>
 		<id>{id}</id>
+		<duration>{game duration}</duration>
 		<grade>{grade}</grade>
 		<hits>{hits}</hits>
 		<misses>{misses}</misses>
@@ -584,6 +591,7 @@ Format:
 </message>
 ```
 `id` è l'id del giocatore a cui si sta inviando il dato
+`duration` è la lunghezza del game fino a quando non si è usciti
 `grade` è il grado del giocatore alla fine della partita
 `hits` è il numero di di hit effettuate
 `misses` è il numero di miss effettuati
@@ -598,6 +606,7 @@ Format:
 	<type>MSG_MATCH_END</type>
 	<data>
 		<id>{id}</id>
+		<duration>{game duration}</duration>
 		<grade>{grade}</grade>
 		<hits>{hits}</hits>
 		<misses>{misses}</misses>
@@ -609,6 +618,7 @@ Format:
 </message>
 ```
 `id` è l'id del giocatore a cui si sta inviando il dato
+`duration` è la lunghezza del game fino a quando non si è usciti
 `grade` è il grado del giocatore alla fine della partita
 `hits` è il numero di di hit effettuate
 `misses` è il numero di miss effettuati

@@ -36,18 +36,22 @@ enum colors {
 	COLOR_ALREADY_HIT = 0x11,
 
 	COLOR_TEXT_GREEN = 0x12,
+	COLOR_TEXT_RED = 0x13
 };
 
 enum input_zone_e {
 	M_NO_INPUT,
+	M_WAIT_KEY_SEE_FIELD,
 	M_SEE_FIELD,
 	M_PRE_GAME,
 	M_PLACE_SHIPS,
 	M_PLACE_A_SHIP,
 	M_MULTI_MODE,
 	M_ACTIONS,
+	M_ACTIONS_SPECTATOR,
 	M_FORFEIT,
 	M_ATTACK,
+	M_CHOOSE_PLAYER
 };
 
 class Client;
@@ -57,8 +61,18 @@ class Gui {
 		Gui(Client *c);
 		~Gui();
 		
+		std::map<int, Player*> *get_player_list();
+		void set_player_list(std::map<int, Player*> player_list);
+
 		bool pregame();
 		bool do_from_input();
+
+		void game_starting();
+		void turn(bool turn);
+		void set_new_board(msg_parsing *msg);
+		void conn_err(msg_parsing *msg);
+		void got_kicked(msg_parsing *msg);
+		void end_game_win(msg_parsing *msg);
 	
 	private:
 		WINDOW *game_wrapper[2];
@@ -106,20 +120,21 @@ class Gui {
 		
 		void send_forfeit(msg_parsing *msg);
 		void make_actions(Player *defender);
+		void make_actions_spectator(Player *defender);
 		
 		void view_field(Player *defender);
 		bool attack_at(Player *defender, int x, int y);
 		void paint_attack(int **board, int x, int y);
 		bool attack(Player *defender);
 		
+		void write_fleet_type(string who);
+		void paint_actions_menu(enum action_e a, int &width, int &height);
+		void color_tile(int i, int j, enum colors color);
+
 		int multi_menu();
 		void wait_conn_menu();
 		bool join_menu();
 		void waiting_host();
-		
-		void write_fleet_type(string who);
-		void paint_actions_menu(enum action_e a, int &width, int &height);
-		void color_tile(int i, int j, enum colors color);
 };
 
 #endif

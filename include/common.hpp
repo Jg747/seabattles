@@ -44,6 +44,7 @@ enum action_e {
 	PLACE_SHIPS,
 	PLACE_A_SHIP,
 	GAME,
+	GAME_SPECTATOR,
 	SEE_FIELD,
 	ALLY,
 	ATTACK,

@@ -50,7 +50,7 @@ const char *MSG_TYPE_STR[] = {
 	"MSG_PLAYER_LIST",
 	"MSG_MATCH_PLAYER_REMOVED",
 	"MSG_MATCH_STARTED",
-	"MSG_MATCH_ALL_PLACED",
+	"MSG_MATCH_TURN",
 	"MSG_MATCH_NEW_BOARD",
 	"MSG_MATCH_WIN",
 	"MSG_MATCH_LOSE",
@@ -76,7 +76,7 @@ const char *GENERIC_STATUS_STR[] = {
 };
 
 static int get_enum(std::string str, const char *arr[], size_t len) {
-	for (int i = 0; i < len; i++) {
+	for (size_t i = 0; i < len; i++) {
 		if (!strcmp(str.c_str(), arr[i])) {
 			return i;
 		}
@@ -190,6 +190,7 @@ static void append_list(pugi::xml_node &data, struct msg_player_list *player_lis
 }
 
 static void append_info(pugi::xml_node &data, struct stats_t *info) {
+	add_node(data, "duration", info->duration);
 	add_node(data, "grade", (int)info->grade);
 	add_node(data, "hits", info->hits);
 	add_node(data, "misses", info->missed);
@@ -342,9 +343,9 @@ static void create_match_player_removed(pugi::xml_document &doc, msg_creation *m
 	append_list(data, &msg->data.match_player_removed.list);
 }
 
-static void create_match_all_placed(pugi::xml_document &doc, msg_creation *msg) {
+static void create_match_turn(pugi::xml_document &doc, msg_creation *msg) {
 	pugi::xml_node data = get_data_node(doc);
-	add_node(data, "turn", msg->data.match_all_placed.turn);
+	add_node(data, "turn", msg->data.match_turn.turn);
 }
 
 static void create_match_new_board(pugi::xml_document &doc, msg_creation *msg) {
@@ -474,8 +475,8 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 		case MSG_MATCH_PLAYER_REMOVED:
 			create_match_player_removed(doc, msg);
 			break;
-		case MSG_MATCH_ALL_PLACED:
-			create_match_all_placed(doc, msg);
+		case MSG_MATCH_TURN:
+			create_match_turn(doc, msg);
 			break;
 		case MSG_MATCH_NEW_BOARD:
 			create_match_new_board(doc, msg);
@@ -544,6 +545,7 @@ static void get_board(pugi::xml_node &data, struct board_t *board) {
 }
 
 static void get_info(pugi::xml_node &data, struct stats_t *info) {
+	info->duration = data.child("duration").text().as_string();
 	info->grade = (enum grade_e)data.child("grade").text().as_int();
 	info->hits = data.child("hits").text().as_int();
 	info->missed = data.child("misses").text().as_int();
@@ -661,9 +663,9 @@ static void parse_match_player_removed(pugi::xml_document &doc, msg_parsing *msg
 	get_player_list(data, &msg->data.match_player_removed.list);
 }
 
-static void parse_match_all_placed(pugi::xml_document &doc, msg_parsing *msg) {
+static void parse_match_turn(pugi::xml_document &doc, msg_parsing *msg) {
 	pugi::xml_node data = get_data_node(doc);
-	msg->data.match_all_placed.turn = data.child("turn").text().as_bool();
+	msg->data.match_turn.turn = data.child("turn").text().as_bool();
 }
 
 static void parse_match_new_board(pugi::xml_document &doc, msg_parsing *msg) {
@@ -778,8 +780,8 @@ void parse_message(std::string &xml_message, msg_parsing *msg) {
 		case MSG_MATCH_PLAYER_REMOVED:
 			parse_match_player_removed(doc, msg);
 			break;
-		case MSG_MATCH_ALL_PLACED:
-			parse_match_all_placed(doc, msg);
+		case MSG_MATCH_TURN:
+			parse_match_turn(doc, msg);
 			break;
 		case MSG_MATCH_NEW_BOARD:
 			parse_match_new_board(doc, msg);
