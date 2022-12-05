@@ -9,6 +9,8 @@
 #include <ncurses.h>
 #endif
 
+#include <client.hpp>
+#include <player.hpp>
 #include <common.hpp>
 
 using std::string;
@@ -47,6 +49,8 @@ enum input_zone_e {
 	M_FORFEIT,
 	M_ATTACK,
 };
+
+class Client;
 
 class Gui {
 	public:

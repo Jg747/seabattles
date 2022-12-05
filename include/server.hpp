@@ -19,7 +19,7 @@
 
 #define MAX_CLIENTS 8
 
-struct client {
+struct client_t {
 	Player *p;
 	int client_socket;
 };
@@ -33,7 +33,7 @@ class Server {
 	private:
 		int server_socket;
 
-		std::vector<struct client*> *clients;
+		std::vector<struct client_t*> *clients;
 		Match *m;
 		bool stop_serv;
 		
@@ -44,7 +44,7 @@ class Server {
 		#endif
 
 		bool add_new_client();
-		bool handle_client_request(struct client *c);
+		bool handle_client_request(struct client_t *c);
 		void reset_fd_set();
 		string get_current_ip_address();
 
@@ -62,6 +62,6 @@ class Server {
 		void reset();
 };
 
-void thread_server(int port);
+void thread_server(Server *s);
 
 #endif

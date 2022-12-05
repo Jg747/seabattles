@@ -11,9 +11,10 @@
 #endif
 
 #include <string>
+#include <thread>
 
-#include <server.hpp>
 #include <client.hpp>
+#include <server.hpp>
 #include <gui.hpp>
 
 #define BUF_LEN (1000+1)
@@ -61,7 +62,7 @@ void Client::start() {
     } while (!stop);
 }
 
-bool Client::create_server() {
+void Client::create_server() {
     if (s == NULL) {
         s = new Server(SERVER_PORT);
     } else {
@@ -69,7 +70,7 @@ bool Client::create_server() {
         delete t_server;
         s = new Server(SERVER_PORT);
     }
-    t_server = new std::thread(s->start());
+    t_server = new std::thread(thread_server, s);
 }
 
 bool Client::connect_to_server(std::string ip, int port) {
@@ -100,6 +101,8 @@ bool Client::connect_to_server(std::string ip, int port) {
         close(client_socket);
         return false;
     }
+
+    return true;
 }
 
 void Client::send_message(msg_creation *msg) {
@@ -118,4 +121,5 @@ void Client::receive_message(msg_parsing *msg) {
 
 bool Client::do_from_socket() {
     // socket reading and merdate varie
+    return true;
 }

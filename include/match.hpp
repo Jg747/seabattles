@@ -4,7 +4,6 @@
 #include <vector>
 #include <string>
 
-#include <server.hpp>
 #include <common.hpp>
 #include <player.hpp>
 
@@ -16,7 +15,6 @@ class Match {
 		enum game_difficulty_e difficulty;
 		enum game_status_e status;
 
-		Server *serv;
 		std::vector<Player*> *players;
 		int player_eliminations;
 

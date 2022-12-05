@@ -72,7 +72,7 @@ bool Server::start() {
 		return false;
 	}
 
-	clients = new std::vector<struct client*>();
+	clients = new std::vector<struct client_t*>();
 	m = NULL;
 	
 	while (!stop_serv) {
@@ -123,7 +123,7 @@ bool Server::add_new_client() {
 	if (clients->size() < MAX_CLIENTS) {
 		in_addr_size = sizeof(remote);
 		
-		struct client *c = new struct client;
+		struct client_t *c = new struct client_t;
 		c->client_socket = accept(server_socket, (struct sockaddr *)&remote, &in_addr_size);
 		
 		std::string msg = create_message(MSG_CONN_ACCEPTED);
@@ -155,7 +155,7 @@ bool Server::add_new_client() {
 	}
 }
 
-bool Server::handle_client_request(struct client *c) {
+bool Server::handle_client_request(struct client_t *c) {
 	size_t len;
 	char buffer[1000+1];
 	string received;

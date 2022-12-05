@@ -5,7 +5,6 @@
 
 #include <common.hpp>
 #include <board.hpp>
-#include <match.hpp>
 
 class Player {
 	protected:

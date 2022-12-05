@@ -4,6 +4,7 @@
 #include <thread>
 
 #include <gui.hpp>
+#include <msg.hpp>
 #include <lang.hpp>
 #include <debug.hpp>
 #include <server.hpp>
@@ -723,6 +724,11 @@ bool Gui::attack_at(Player *defender, int x, int y) {
 		client->send_message(&c_msg);
 		client->receive_message(&p_msg);
 	} while (p_msg.msg_type != ACK_MSG_MATCH_ATTACK_STATUS && p_msg.msg_type != ACK_MSG_MATCH_ATTACK_ERR);
+	
+	if (p_msg.msg_type == ACK_MSG_MATCH_ATTACK_ERR) {
+		return false;
+	}
+	return true;
 }
 
 bool Gui::attack(Player *defender) {
@@ -930,6 +936,8 @@ bool Gui::do_from_input() {
 				// ...
 			}
 			break;
+		default:
+			break;
 	}
 
 	return true;
@@ -1013,6 +1021,7 @@ bool Gui::join_menu() {
 	} while (!((MultiMatch*)m)->check_connection(str));
 
 	return true;*/
+	return true;
 }
 
 void Gui::waiting_host() {

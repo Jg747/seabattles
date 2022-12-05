@@ -3,8 +3,11 @@
 
 #include <thread>
 
-#include <gui.hpp>
+#include <server.hpp>
 #include <msg.hpp>
+#include <gui.hpp>
+
+class Gui;
 
 class Client {
     private:
@@ -18,16 +21,14 @@ class Client {
         std::thread *t_server;
 
         void reset_fd_set();
-
         bool connect_to_server(std::string ip, int port);
-
         bool do_from_socket();
 
     public:
         Client();
         ~Client();
 
-        bool create_server();
+        void create_server();
 
         void start();
         void send_message(msg_creation *msg);
