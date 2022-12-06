@@ -16,8 +16,8 @@
 
 #include <player.hpp>
 #include <match.hpp>
-
-#define MAX_CLIENTS 8
+#include <msg.hpp>
+#include <common.hpp>
 
 struct client_t {
 	Player *p;
@@ -51,10 +51,11 @@ class Server {
 		bool add_new_client();
 		bool handle_client_request(struct client_t *c);
 		void reset_fd_set();
-		string get_current_ip_address();
 
 		void create_match();
-		Match *get_match();
+
+		void send_message(int client_socket, msg_creation *msg);
+        void receive_message(int client_socket, msg_parsing *msg);
 
 	public:	
 		struct server_error error;
@@ -67,6 +68,8 @@ class Server {
 		void reset();
 
 		bool is_running();
+
+		static string get_current_ip_address();
 };
 
 void thread_server(Server *s);

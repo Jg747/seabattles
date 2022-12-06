@@ -6,6 +6,9 @@
 #define SERVER_PORT 42069
 #define SERVER_IP "127.0.0.1"
 
+#define MAX_CLIENTS 8
+#define RECV_BUF_LEN (1000+1)
+
 #define DEFAULT_PLAYER_NAME "player"
 
 #define BOARD_SIZE 10
@@ -62,9 +65,8 @@ enum command_e {
 };
 
 enum game_status_e {
-	START,
-	RUNNING,
-	END
+	NOT_RUNNING,
+	RUNNING
 };
 
 enum player_status_e {

@@ -7,7 +7,7 @@
 #include <common.hpp>
 
 extern const char *MSG_TYPE_STR[];
-#define MSG_TYPE_STR_LEN 32
+#define MSG_TYPE_STR_LEN 35
 
 extern const char *ATTACK_STATUS_STR[];
 #define ATTACK_STATUS_STR_LEN 8
@@ -57,7 +57,9 @@ enum msg_type_e {
 	MSG_MATCH_WIN,
 	MSG_MATCH_LOSE,
 	MSG_MATCH_END,
-	MSG_MATCH_GOT_KICKED
+	MSG_MATCH_GOT_KICKED,
+
+	UNKNOWN
 };
 
 struct ship_t {

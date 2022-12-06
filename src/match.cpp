@@ -1,10 +1,10 @@
 #include <iostream>
 #include <chrono>
 
+#include <debug.hpp>
 #include <server.hpp>
 #include <match.hpp>
 #include <common.hpp>
-#include <debug.hpp>
 #include <player.hpp>
 
 using std::to_string;

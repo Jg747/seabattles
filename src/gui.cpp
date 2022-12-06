@@ -3,10 +3,10 @@
 #include <unistd.h>
 #include <thread>
 
+#include <debug.hpp>
 #include <gui.hpp>
 #include <msg.hpp>
 #include <lang.hpp>
-#include <debug.hpp>
 #include <server.hpp>
 #include <client.hpp>
 #include <player.hpp>
@@ -14,6 +14,21 @@
 #include <ship.hpp>
 
 using std::to_string;
+
+const char *INPUT_ZONE_STR[] = {
+	"M_NO_INPUT",
+	"M_WAIT_KEY_SEE_FIELD",
+	"M_SEE_FIELD",
+	"M_PRE_GAME",
+	"M_PLACE_SHIPS",
+	"M_PLACE_A_SHIP",
+	"M_MULTI_MODE",
+	"M_ACTIONS",
+	"M_ACTIONS_SPECTATOR",
+	"M_FORFEIT",
+	"M_ATTACK",
+	"M_CHOOSE_PLAYER"
+};
 
 Gui::Gui(Client *c) {
 	init_gui();
@@ -34,6 +49,10 @@ Gui::~Gui() {
 			delwin(sea[i][j]);
 		}
 	}
+	if (Logger::debug) {
+		del_array_win(debug_win, 2);
+		Logger::win = NULL;
+	}
 }
 
 void Gui::del_array_win(WINDOW* array[], int len) {
@@ -41,6 +60,16 @@ void Gui::del_array_win(WINDOW* array[], int len) {
 		if (array[i] != NULL) {
 			delwin(array[i]);
 		}
+	}
+}
+
+void Gui::debug_window() {
+	if (Logger::debug) {
+		box(debug_win[1], ACS_VLINE, ACS_HLINE);
+		wrefresh(debug_win[1]);
+		wclear(debug_win[0]);
+		wprintw(debug_win[0], "%s", Logger::get_last_lines().c_str());
+		wrefresh(debug_win[0]);
 	}
 }
 
@@ -75,8 +104,25 @@ void Gui::init_gui() {
 
 	//Title
 	game_wrapper[0] = newwin(LINES-2, COLS-2, 1, 1);
-	mvwprintw(game_wrapper[0], 0, (COLS/2)-(string(string(TITLE) + " " + string(GAME_VERSION)).length()/2), "%s %s", TITLE, GAME_VERSION);
-	
+	if (!Logger::debug) {
+		mvwprintw(game_wrapper[0], 0, (COLS/2)-(string(string(TITLE) + " " + string(GAME_VERSION)).length()/2), "%s %s", TITLE, GAME_VERSION);
+	} else {
+		mvwprintw(game_wrapper[0], 0, (COLS/6)-string(string(TITLE) + string(GAME_VERSION)).length()/2, "%s %s", TITLE, GAME_VERSION);
+	}
+
+	//Debug
+	if (Logger::debug) {
+		Logger::lines = round((LINES / 100.0) * (float)PERCENT_DEBUG) - 2;
+
+		debug_win[1] = newwin(Logger::lines + 2, (COLS / 3 * 2) + 2, 0, COLS - ((COLS / 3 * 2) + 2));
+		box(debug_win[1], ACS_VLINE, ACS_HLINE);
+
+		debug_win[0] = newwin(Logger::lines, (COLS / 3) * 2, 1, COLS - 1 - (COLS / 3) * 2);
+		scrollok(debug_win[0], true);
+		
+		Logger::win = debug_win[0];
+	}
+
 	//Execution
 	start_menu[0] = newwin(LINES-5, COLS-4, 3, 2);
 
@@ -85,6 +131,10 @@ void Gui::init_gui() {
 	wrefresh(game_wrapper[0]);
 	wrefresh(start_menu[1]);
 	wrefresh(start_menu[0]);
+
+	debug_window();
+
+	Logger::write("Created GUI");
 }
 
 void Gui::init_game_windows() {
@@ -111,6 +161,8 @@ void Gui::init_game_windows() {
 
 	wrefresh(actions[1]);
 	wrefresh(actions[0]);
+
+	debug_window();
 }
 
 void Gui::init_sea() {
@@ -194,6 +246,7 @@ string Gui::get_input(WINDOW *w) {
 }
 
 void Gui::new_zone(enum input_zone_e new_zone) {
+	Logger::write("new zone: " + string(INPUT_ZONE_STR[new_zone]));
 	in_zone = new_zone;
 	print_window = true;
 }
@@ -242,11 +295,13 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 				}
 				break;
 			case '\n':
+				Logger::write("selected: " + to_string(select));
 				return select;
 				break;
 			default: break;
 		}
 
+		Logger::write("selected: no selection");
 		return -1;
 	} else {
 		select = 0;
@@ -285,6 +340,7 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 			}
 		}
 		
+		Logger::write("selected: " + to_string(select));
 		return select;
 	}
 }
@@ -345,6 +401,8 @@ void Gui::paint_placement_sea() {
 		}
 	}
 	//-------
+
+	debug_window();
 }
 
 int Gui::game_menu() {
@@ -357,7 +415,11 @@ int Gui::game_menu() {
 	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 - 1, "  Multiplayer");
 	mvwrite_on_window(start_menu[0], x/2 - 7, y/2 + 1, "  Exit");
 	wrefresh(start_menu[0]);
-	
+
+	debug_window();
+
+	Logger::write("now in gamemode selection");
+
 	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 3, ">", true);
 }
 
@@ -372,6 +434,10 @@ int Gui::diff_menu() {
 	mvwrite_on_window(start_menu[0], x/2 - 3, y/2, "  Impossible");
 	mvwrite_on_window(start_menu[0], x/2 - 3, y/2 + 2, "  Back");
 	wrefresh(start_menu[0]);
+
+	debug_window();
+
+	Logger::write("now in difficulty selection");
 
 	return menu_cursor(start_menu[0], x/2 - 3, y/2 - 2, 4, ">", true);
 }
@@ -446,6 +512,9 @@ void Gui::paint_actions_menu(enum action_e a, int &width, int &height) {
 			// Implementation only in multiplayer
 			break;
 	}
+
+	debug_window();
+
 	print_window = false;
 }
 
@@ -682,6 +751,8 @@ void Gui::paint_enemy_sea(Player *defender) {
 			color_tile(i, j, (enum colors)matrix[i][j]);
 		}
 	}
+
+	debug_window();
 }
 
 void Gui::view_field(Player *defender) {
@@ -856,13 +927,16 @@ bool Gui::pregame() {
     if (value == SINGLEPLAYER) {
 		this->mode = SINGLEPLAYER;
 
-		dummy = new Player(true);
-		client->create_server();
-
         value = diff_menu();
         if (value == 3) {
             return true;
         }
+
+		dummy = new Player(true);
+		client->create_server();
+		if (!client->connect_to_server(SERVER_IP, SERVER_PORT)) {
+			Logger::write("Error: " + client->get_error());
+		}
 
 		if (!init_singleplayer_game((enum game_difficulty_e)value, 2)) {
 			return true;

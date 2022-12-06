@@ -22,7 +22,6 @@ class Client {
         std::thread *t_server;
 
         void reset_fd_set();
-        bool connect_to_server(std::string ip, int port);
         bool do_from_socket();
 
         void reset_player_list();
@@ -32,11 +31,11 @@ class Client {
         ~Client();
 
         void create_server();
-        void stop_server() {
-            s->stop();
-        }
+        void stop_server();
 
+        std::string get_error();
         bool start();
+        bool connect_to_server(std::string ip, int port);
         void send_message(msg_creation *msg);
         void receive_message(msg_parsing *msg);
 };

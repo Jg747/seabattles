@@ -1,7 +1,7 @@
 #include <player.hpp>
+#include <debug.hpp>
 #include <common.hpp>
 #include <board.hpp>
-#include <debug.hpp>
 
 void Player::set_id_start(int start) {
 	Player::id = start;

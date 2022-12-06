@@ -15,10 +15,10 @@ is going to be your server
 #include <unistd.h>
 #endif
 
+#include <debug.hpp>
 #include <server.hpp>
 #include <common.hpp>
 #include <msg.hpp>
-#include <debug.hpp>
 
 #ifdef _WIN32
 // ...
@@ -28,6 +28,7 @@ Server::Server(int port) {
 		error.is_error = true;
 		error.error += "- Server socket creation error\n";
 		server_socket = -1;
+		return;
 	}
 
 	struct sockaddr_in local_addr;
@@ -40,6 +41,7 @@ Server::Server(int port) {
 		error.error += "- Bind error\n";
 		close(server_socket);
 		server_socket = -1;
+		return;
 	}
 
 	if (listen(server_socket, 3) < 0) {
@@ -47,6 +49,7 @@ Server::Server(int port) {
 		error.error += "- Listen on socket error\n";
 		close(server_socket);
 		server_socket = -1;
+		return;
 	}
 
 	stop_serv = false;
@@ -80,32 +83,47 @@ void Server::reset_fd_set() {
 
 bool Server::start() {
 	if (error.is_error) {
+		Logger::write("Server error: " + error.error);
 		return false;
 	}
+	Logger::write("Server started");
 
 	clients = new std::vector<struct client_t*>();
 	
 	while (!stop_serv) {
 		reset_fd_set();
-		if (select(FD_SETSIZE, &sock_list, NULL, NULL, NULL) < 0) {
-			this->error.is_error = true;
-			this->error.error += "- Server::start()::select()\n";
-			return false;
-		}
-		
-		if (FD_ISSET(server_socket, &sock_list)) {
-			add_new_client();
-		}
-		for (auto c : *clients) {
-			if (FD_ISSET(c->client_socket, &sock_list)) {
-				handle_client_request(c);
+		if (select(FD_SETSIZE, &sock_list, NULL, NULL, NULL) >= 0) {
+			if (FD_ISSET(server_socket, &sock_list)) {
+				add_new_client();
 			}
+			for (auto c : *clients) {
+				if (FD_ISSET(c->client_socket, &sock_list)) {
+					handle_client_request(c);
+				}
+			}	
 		}
 	}
 
+	Logger::write("Server stopped");
 	reset();
 
 	return true;
+}
+
+void Server::send_message(int client_socket, msg_creation *msg) {
+    std::string buffer = create_message(msg->msg_type, msg);
+    Logger::write("[server] Sending " + string(MSG_TYPE_STR[msg->msg_type]));
+    
+    send(client_socket, buffer.c_str(), buffer.length(), 0);
+}
+
+void Server::receive_message(int client_socket, msg_parsing *msg) {
+    char buffer[RECV_BUF_LEN];
+
+    recv(client_socket, buffer, RECV_BUF_LEN, 0);
+    std::string buf_string = std::string(buffer);
+    parse_message(buf_string, msg);
+    Logger::write("[server] Received " + string(MSG_TYPE_STR[msg->msg_type]));
 }
 
 void Server::stop() {
@@ -124,45 +142,57 @@ void Server::reset() {
 		}
 	}
 	delete clients;
+
+	Logger::write("Server reset");
 }
 
 bool Server::add_new_client() {
-	socklen_t in_addr_size;
+	socklen_t remote_len;
 	struct sockaddr_in remote;
 
+	int temp_client;
+	msg_creation c_msg;
+	msg_parsing r_msg;
+	std::string buf;
+	
+	bool result;
+
 	if (clients->size() < MAX_CLIENTS) {
-		in_addr_size = sizeof(remote);
-		
+		remote_len = sizeof(remote);
+		temp_client = accept(server_socket, (struct sockaddr *)&remote, &remote_len);
+
+		c_msg.msg_type = MSG_CONN_ACCEPTED;
+		send_message(temp_client, &c_msg);
+
 		struct client_t *c = new struct client_t;
-		c->client_socket = accept(server_socket, (struct sockaddr *)&remote, &in_addr_size);
-		
-		std::string msg = create_message(MSG_CONN_ACCEPTED);
-		if (send(c->client_socket, msg.c_str(), msg.size(), 0) < 0) {
-			// error
-			error.is_error = true;
-			error.error += "- Server::add_new_client()::send() | OK_ADD";
-		}
+		c->client_socket = temp_client;
 		clients->push_back(c);
-		return true;
-	} else {
-		// send error to client
-		in_addr_size = sizeof(remote);
-		int temp_client = accept(server_socket, (struct sockaddr *)&remote, &in_addr_size);
-		if (temp_client < 0) {
-			// error
-			error.is_error = true;
-			error.error += "- Server::add_new_client()::accept() | NO_ADD";
-		} else {
-			std::string msg = create_message(MSG_CONN_SERVER_FULL);
-			if (send(temp_client, msg.c_str(), msg.size(), 0) < 0) {
-				// error
-				error.is_error = true;
-				error.error += "- Server::add_new_client()::send() | NO_ADD";
-			}
-			close(temp_client);
-		}
-		return false;
+
+		result = true;
+	} else if (clients->size() >= MAX_CLIENTS) {
+		remote_len = sizeof(remote);
+		temp_client = accept(server_socket, (struct sockaddr *)&remote, &remote_len);
+		
+		c_msg.msg_type = MSG_CONN_SERVER_FULL;
+		send_message(temp_client, &c_msg);
+
+		result = false;
+	} else if (m != NULL && m->get_status() == RUNNING) {
+		remote_len = sizeof(remote);
+		temp_client = accept(server_socket, (struct sockaddr *)&remote, &remote_len);
+		
+		c_msg.msg_type = MSG_CONN_MATCH_STARTED;
+		send_message(temp_client, &c_msg);
+
+		result = false;
 	}
+
+	receive_message(temp_client, &r_msg);
+	if (!result) {
+		close(temp_client);
+	}
+
+	return result;
 }
 
 bool Server::is_running() {
@@ -183,21 +213,18 @@ bool Server::handle_client_request(struct client_t *c) {
 	return true;
 }
 
-string Server::get_current_ip_address() {
-	return "";
-}
-
 void Server::create_match() {
 	m = new Match();
 }
 
-Match *Server::get_match() {
-	return this->m;
+string Server::get_current_ip_address() {
+	return "";
 }
 
 
-
+// Server thread, non toccare con quelle tue luride manine
 void thread_server(Server *s) {
+	Logger::write("Starting server thread...");
 	s->start();
 }
 #endif

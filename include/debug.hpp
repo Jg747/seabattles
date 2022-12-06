@@ -1,15 +1,31 @@
-#ifndef __DEBUG_H__
-#define __DEBUG_H__ 
+#ifndef __debug_h__
+#define __debug_h__ 
 
-#include <stdbool.h>
-#include <stdio.h>
+#include <fstream>
+#include <string>
+#include <deque>
 
-extern FILE* debug_log_fd;
-extern bool debug_mode;
+#ifdef _WIN32
+#include <ncurses/ncurses.h>
+#else
+#include <ncurses.h>
+#endif
 
-#define DEBUG_SET(mode) (debug_mode = mode);
-#define START_DEBUG() debug_log_fd = fopen("debug.log", "w"); debug_mode = true;
-#define STOP_DEBUG() if (debug_mode) { fclose(debug_log_fd); debug_mode = false; }
-#define DEBUG_WRITE_LOG(fmt, args...) if (debug_mode) { fprintf(debug_log_fd, fmt, ##args); }
+#define FILE_NAME "debug.log"
+
+class Logger {
+    public:
+        static inline bool debug = false;
+        static inline WINDOW* win = NULL;
+        static inline size_t lines = 0;
+        
+        static std::string get_last_lines();
+        static void write(std::string str);
+        static void stop();
+
+    private:
+        static inline std::ofstream log_file;
+        static inline std::deque<std::string> last_lines;
+};
 
 #endif

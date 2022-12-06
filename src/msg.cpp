@@ -7,6 +7,7 @@
 #include <vector>
 #include <string.h>
 
+#include <debug.hpp>
 #include <pugi/pugixml.hpp>
 #include <msg.hpp>
 
@@ -55,7 +56,9 @@ const char *MSG_TYPE_STR[] = {
 	"MSG_MATCH_WIN",
 	"MSG_MATCH_LOSE",
 	"MSG_MATCH_END",
-	"MSG_MATCH_GOT_KICKED"
+	"MSG_MATCH_GOT_KICKED",
+
+	"UNKNOWN"
 };
 
 const char *ATTACK_STATUS_STR[] = {
@@ -512,13 +515,22 @@ std::string create_message(enum msg_type_e type) {
 static enum msg_type_e get_msg_type(pugi::xml_document &doc) {
 	pugi::xml_node type = doc.child("message").child("type");
 	std::string msg_type = type.text().as_string();
+	int value;
 
+	value = get_enum(msg_type, MSG_TYPE_STR, MSG_TYPE_STR_LEN);
 	if (msg_type != "ack") {
-		return (enum msg_type_e)get_enum(msg_type, MSG_TYPE_STR, MSG_TYPE_STR_LEN);
+		if (value == -1) {
+			return UNKNOWN;
+		}
+		return (enum msg_type_e)value;
 	} else {
 		pugi::xml_node ack_type = get_data_node(doc).child("acktype");
 		msg_type = ack_type.text().as_string();
-		return (enum msg_type_e)get_enum(msg_type, MSG_TYPE_STR, MSG_TYPE_STR_LEN);
+		value = get_enum(msg_type, MSG_TYPE_STR, MSG_TYPE_STR_LEN);
+		if (value == -1) {
+			return UNKNOWN;
+		}
+		return (enum msg_type_e)value;
 	}
 }
 
@@ -800,6 +812,7 @@ void parse_message(std::string &xml_message, msg_parsing *msg) {
 			break;
 		
 		default:
+			msg->msg_type = UNKNOWN;
 			break;
 	}
 }

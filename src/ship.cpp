@@ -1,9 +1,10 @@
+#include <string>
+
+#include <debug.hpp>
 #include <ship.hpp>
 #include <common.hpp>
 
 const int ships_len[] = {5, 4, 3, 3, 2};
-
-#include <string>
 
 using std::string;
 using std::to_string;

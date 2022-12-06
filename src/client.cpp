@@ -13,11 +13,12 @@
 #include <string>
 #include <thread>
 
+#include <debug.hpp>
 #include <client.hpp>
 #include <server.hpp>
 #include <gui.hpp>
-
-#define BUF_LEN (1000+1)
+#include <msg.hpp>
+#include <common.hpp>
 
 Client::Client() {
     g = new Gui(this);
@@ -52,11 +53,13 @@ void Client::reset_fd_set() {
 
 bool Client::start() {
     if (!g->pregame()) {
-        if (s->is_running()) {
+        if (s != NULL && s->is_running()) {
             s->stop();
         }
         return false;
     }
+
+    Logger::write("Pregame successfully passed");
 
     do {
         reset_fd_set();
@@ -80,10 +83,13 @@ bool Client::start() {
 void Client::create_server() {
     if (s == NULL) {
         s = new Server(SERVER_PORT);
+        Logger::write("Created server (" + std::to_string(SERVER_PORT) + ")");
     } else {
         delete s;
         delete t_server;
+        Logger::write("Deleted previous server");
         s = new Server(SERVER_PORT);
+        Logger::write("Created server (" + std::to_string(SERVER_PORT) + ")");
     }
     t_server = new std::thread(thread_server, s);
 }
@@ -125,16 +131,18 @@ bool Client::connect_to_server(std::string ip, int port) {
 
 void Client::send_message(msg_creation *msg) {
     std::string buffer = create_message(msg->msg_type, msg);
+    Logger::write("[client] Sending " + string(MSG_TYPE_STR[msg->msg_type]));
     
     send(client_socket, buffer.c_str(), buffer.length(), 0);
 }
 
 void Client::receive_message(msg_parsing *msg) {
-    char buffer[BUF_LEN];
+    char buffer[RECV_BUF_LEN];
 
-    recv(client_socket, buffer, BUF_LEN, 0);
+    recv(client_socket, buffer, RECV_BUF_LEN, 0);
     std::string buf_string = std::string(buffer);
     parse_message(buf_string, msg);
+    Logger::write("[client] Received " + string(MSG_TYPE_STR[msg->msg_type]));
 }
 
 void Client::reset_player_list() {
@@ -173,6 +181,8 @@ bool Client::do_from_socket() {
         case MSG_CONN_ERR:
         case MSG_CONN_SERVER_FULL:
         case MSG_CONN_MATCH_STARTED:
+            close(client_socket);
+            client_socket = -1;
             g->conn_err(&this->r_msg);
             stop = true;
             break;
@@ -209,4 +219,12 @@ bool Client::do_from_socket() {
     }
 
     return true;
+}
+
+std::string Client::get_error() {
+    return this->error;
+}
+
+void Client::stop_server() {
+    s->stop();
 }

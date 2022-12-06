@@ -16,6 +16,7 @@
 using std::string;
 
 #define PERCENT_SEA 75
+#define PERCENT_DEBUG 20
 
 #define CORRECT(x, b) (x < 0 ? 0 : (x > b - 1 ? b - 1 : x))
 #define CORRECT_W(x) CORRECT(x, COLS)
@@ -38,6 +39,9 @@ enum colors {
 	COLOR_TEXT_GREEN = 0x12,
 	COLOR_TEXT_RED = 0x13
 };
+
+extern const char *INPUT_ZONE_STR[];
+#define INPUT_ZONE_LEN 12
 
 enum input_zone_e {
 	M_NO_INPUT,
@@ -82,6 +86,8 @@ class Gui {
 		WINDOW *sea[BOARD_SIZE + 1][BOARD_SIZE + 1];
 		WINDOW *actions[2];
 
+		WINDOW *debug_win[2];
+
 		enum gamemode_e mode;
 		bool print_window;
 		enum input_zone_e in_zone;
@@ -92,6 +98,8 @@ class Gui {
 		Client *client;
 		Player *dummy;
 		std::map<int, Player*> p_list;
+
+		void debug_window();
 
 		void del_array_win(WINDOW *array[], int len);
 		void init_gui();
