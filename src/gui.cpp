@@ -1067,6 +1067,8 @@ void Gui::end_game_win(msg_parsing *msg) {
 	} else if (msg->msg_type == ACK_MSG_MATCH_END) {
 		mvwrite_on_window(start_menu[0], width/2 - 3, height/2 - 3, "GAME END!");
 		stats = &msg->data.ack_match_end.info;
+	} else {
+		return;
 	}
 
 	mvwrite_on_window(start_menu[0], width/2 - 8, height/2 - 1, "Total shots: " + to_string(stats->hits + stats->missed));

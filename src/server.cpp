@@ -27,34 +27,47 @@ Server::Server(int port) {
 	if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		error.is_error = true;
 		error.error += "- Server socket creation error\n";
+		server_socket = -1;
 	}
 
 	struct sockaddr_in local_addr;
 	local_addr.sin_family = AF_INET;
-	local_addr.sin_addr.s_addr = port;
 	local_addr.sin_port = htons(port);
+	local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	if (bind(server_socket, (struct sockaddr*)&local_addr, sizeof(local_addr)) < 0) {
 		error.is_error = true;
 		error.error += "- Bind error\n";
+		close(server_socket);
+		server_socket = -1;
 	}
 
 	if (listen(server_socket, 3) < 0) {
 		error.is_error = true;
 		error.error += "- Listen on socket error\n";
+		close(server_socket);
+		server_socket = -1;
 	}
 
 	stop_serv = false;
+	clients = NULL;
+	m = NULL;
 }
 
 Server::~Server() {
-	for (auto c : *clients) {
-		if (c->client_socket >= 0) {
-			close(c->client_socket);
-			delete c->p;
+	if (clients != NULL) {
+		for (auto c : *clients) {
+			if (c->client_socket >= 0) {
+				close(c->client_socket);
+				delete c->p;
+			}
+			delete c;
 		}
 	}
-	shutdown(server_socket, SHUT_RDWR);
+
+	if (server_socket >= 0) {
+		close(server_socket);
+	}
 }
 
 void Server::reset_fd_set() {
@@ -71,7 +84,6 @@ bool Server::start() {
 	}
 
 	clients = new std::vector<struct client_t*>();
-	m = NULL;
 	
 	while (!stop_serv) {
 		reset_fd_set();

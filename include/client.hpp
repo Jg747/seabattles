@@ -32,6 +32,9 @@ class Client {
         ~Client();
 
         void create_server();
+        void stop_server() {
+            s->stop();
+        }
 
         bool start();
         void send_message(msg_creation *msg);

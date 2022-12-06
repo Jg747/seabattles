@@ -24,14 +24,24 @@ Client::Client() {
     s = NULL;
     t_server = NULL;
     stop = true;
+    client_socket = -1;
 }
 
 Client::~Client() {
     delete g;
     if (s != NULL) {
+        s->stop();
         delete s;
+        s = NULL;
+        if (t_server != NULL) {
+            t_server->join();
+            delete t_server;
+        }
+        t_server = NULL;
     }
-    close(client_socket);
+    if (client_socket >= 0) {
+        close(client_socket);
+    }
 }
 
 void Client::reset_fd_set() {
@@ -82,6 +92,7 @@ bool Client::connect_to_server(std::string ip, int port) {
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket < 0) {
         error = "[ERROR] Socket creation failed";
+        client_socket = -1;
         return false;
     }
 
@@ -92,6 +103,7 @@ bool Client::connect_to_server(std::string ip, int port) {
     if (bind(client_socket, (struct sockaddr*)&address, sizeof(address)) < 0) {
         error = "[ERROR] Binding failed";
         close(client_socket);
+        client_socket = -1;
         return false;
     }
 
@@ -104,6 +116,7 @@ bool Client::connect_to_server(std::string ip, int port) {
     if (connect(client_socket, (struct sockaddr*)&address, sizeof(address)) < 0) {
         error  = "[ERROR] Connect failed";
         close(client_socket);
+        client_socket = -1;
         return false;
     }
 
