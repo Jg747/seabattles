@@ -916,12 +916,12 @@ void Gui::make_actions_spectator(Player *defender) {
 	}
 }
 
-bool Gui::pregame() {
+int Gui::pregame() {
 	new_zone(M_PRE_GAME);
 
 	int value = game_menu();
     if (value == 2) {
-        return false;
+        return 0;
     }
 
     if (value == SINGLEPLAYER) {
@@ -929,7 +929,7 @@ bool Gui::pregame() {
 
         value = diff_menu();
         if (value == 3) {
-            return true;
+            return 2;
         }
 
 		dummy = new Player(true);
@@ -939,7 +939,7 @@ bool Gui::pregame() {
 		}
 
 		if (!init_singleplayer_game((enum game_difficulty_e)value, 2)) {
-			return true;
+			return 1;
 		}
     } else if (value == MULTIPLAYER) {
 		this->mode = MULTIPLAYER;
@@ -950,7 +950,7 @@ bool Gui::pregame() {
 
 	new_zone(M_NO_INPUT);
 
-	return true;
+	return 1;
 }
 
 bool Gui::init_singleplayer_game(enum game_difficulty_e diff, int num_ai) {

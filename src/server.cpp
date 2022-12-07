@@ -150,7 +150,7 @@ bool Server::add_new_client() {
 	socklen_t remote_len;
 	struct sockaddr_in remote;
 
-	int temp_client;
+	int temp_client = 0;
 	msg_creation c_msg;
 	msg_parsing r_msg;
 	std::string buf;
@@ -184,6 +184,8 @@ bool Server::add_new_client() {
 		c_msg.msg_type = MSG_CONN_MATCH_STARTED;
 		send_message(temp_client, &c_msg);
 
+		result = false;
+	} else {
 		result = false;
 	}
 

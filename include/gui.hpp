@@ -68,7 +68,7 @@ class Gui {
 		std::map<int, Player*> *get_player_list();
 		void set_player_list(std::map<int, Player*> player_list);
 
-		bool pregame();
+		int pregame();
 		bool do_from_input();
 
 		void game_starting();

@@ -52,11 +52,15 @@ void Client::reset_fd_set() {
 }
 
 bool Client::start() {
-    if (!g->pregame()) {
+    int temp = g->pregame();
+    if (temp == 0) {
         if (s != NULL && s->is_running()) {
             s->stop();
         }
         return false;
+    } else if (temp == 2) {
+        Logger::write("Retrying mode choice");
+        return true;
     }
 
     Logger::write("Pregame successfully passed");
