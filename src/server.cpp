@@ -169,6 +169,7 @@ bool Server::add_new_client() {
 		clients->push_back(c);
 
 		result = true;
+		receive_message(temp_client, &r_msg);
 	} else if (clients->size() >= MAX_CLIENTS) {
 		remote_len = sizeof(remote);
 		temp_client = accept(server_socket, (struct sockaddr *)&remote, &remote_len);
@@ -177,6 +178,7 @@ bool Server::add_new_client() {
 		send_message(temp_client, &c_msg);
 
 		result = false;
+		receive_message(temp_client, &r_msg);
 	} else if (m != NULL && m->get_status() == RUNNING) {
 		remote_len = sizeof(remote);
 		temp_client = accept(server_socket, (struct sockaddr *)&remote, &remote_len);
@@ -185,11 +187,11 @@ bool Server::add_new_client() {
 		send_message(temp_client, &c_msg);
 
 		result = false;
+		receive_message(temp_client, &r_msg);
 	} else {
 		result = false;
 	}
 
-	receive_message(temp_client, &r_msg);
 	if (!result) {
 		close(temp_client);
 	}
