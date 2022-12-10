@@ -14,16 +14,6 @@ void Match::set_time(time_t &time) {
 	time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 }
 
-string Match::get_duration() {
-	std::chrono::time_point<std::chrono::system_clock> s = std::chrono::system_clock::from_time_t(start_time);
-	std::chrono::time_point<std::chrono::system_clock> e = std::chrono::system_clock::from_time_t(end_time);
-	std::chrono::duration<double> difference = e - s;
-	long seconds = difference.count();
-	int min = seconds / 60;
-	seconds = seconds % 60;
-	return to_string(min) + " : " + ((int)(seconds / 10) == 0 ? "0" : "") + to_string(seconds);
-}
-
 enum game_difficulty_e Match::get_difficulty() {
 	return this->difficulty;
 }
@@ -50,11 +40,7 @@ void Match::set_status(enum game_status_e new_status) {
 
 Match::Match() {
 	players = new std::vector<Player*>();
-}
-
-Match::Match(enum gamemode_e e) {
-	players = new std::vector<Player*>();
-	mode = e;
+	status = NOT_RUNNING;
 }
 
 Match::~Match() {
@@ -93,6 +79,8 @@ bool Match::remove_player(int id) {
 }
 
 void Match::start_match() {
+	status = RUNNING;
+
 	int rand_x;
 	int rand_y;
 	int rand_r;
@@ -102,7 +90,7 @@ void Match::start_match() {
 	for (auto p : *players) {
 		for (auto enemy : *players) {
 			if (p != enemy) {
-				p->add_player_to_attack(*enemy);
+				p->add_player_to_attack(enemy);
 			}
 		}
 
@@ -123,8 +111,66 @@ void Match::start_match() {
 					}
 				}
 			}
+			p->set_placed_ships(true);
 		}
 	}
 
 	Match::set_time(start_time);
+	(*players)[0]->set_turn(true);
+	for (int i = 1; i < players->size(); i++) {
+		(*players)[i]->set_turn(false);
+	}
+}
+
+std::vector<Player*> *Match::get_players() {
+	return this->players;
+}
+
+bool Match::all_attacked(Player *p) {
+	for (auto def : *players) {
+		if (!p->get_attack(def)->attacked) {
+			return false;
+		}
+	}
+	return true;
+}
+
+Player *Match::get_player_by_id(int id) {
+	for (auto p : *players) {
+		if (p->get_id() == id) {
+			return p;
+		}
+	}
+	return NULL;
+}
+
+string Match::get_duration(time_t start, time_t end) {
+	std::chrono::time_point<std::chrono::system_clock> s = std::chrono::system_clock::from_time_t(start);
+	std::chrono::time_point<std::chrono::system_clock> e = std::chrono::system_clock::from_time_t(end);
+	std::chrono::duration<double> difference = e - s;
+	long seconds = difference.count();
+	int min = seconds / 60;
+	seconds = seconds % 60;
+	return to_string(min) + " : " + ((int)(seconds / 10) == 0 ? "0" : "") + to_string(seconds);
+}
+
+time_t Match::get_start_time() {
+	return this->start_time;
+}
+
+bool Match::can_start() {
+	for (auto p : *players) {
+		if (!p->has_placed_ships()) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool Match::is_winner(Player *p) {
+	return get_player_by_id(p->get_id()) != NULL && players->size() == 1;
+}
+
+bool Match::eliminated(Player *p) {
+	return p->get_board()->remaining_ships() == 0;
 }

@@ -3,6 +3,7 @@
 
 #include <thread>
 #include <vector>
+#include <string>
 
 #ifdef _WIN32
 
@@ -38,6 +39,7 @@ class Server {
 	private:
 		int server_socket;
 
+		std::string ip_addr;
 		std::vector<struct client_t*> *clients;
 		Match *m;
 		bool stop_serv;
@@ -49,6 +51,9 @@ class Server {
 		#endif
 
 		bool add_new_client();
+		struct client_t *get_client(int id);
+		void remove_client(int client_socket);
+
 		bool handle_client_request(struct client_t *c);
 		void reset_fd_set();
 
@@ -56,6 +61,21 @@ class Server {
 
 		void send_message(int client_socket, msg_creation *msg);
         void receive_message(int client_socket, msg_parsing *msg);
+
+		void handle_player_get_own_id(struct client_t *c, msg_parsing *msg);
+		void handle_player_ship_placement(struct client_t *c, msg_parsing *msg);
+		void handle_player_get_board(struct client_t *c, msg_parsing *msg);
+		void handle_player_get_board_lost(struct client_t *c, msg_parsing *msg);
+		void handle_player_attack(struct client_t *c, msg_parsing *msg);
+		void handle_player_quit(struct client_t *c);
+		void handle_host_init_match(struct client_t *c, msg_parsing *msg);
+		void handle_host_start_match(struct client_t *c);
+		void handle_host_player_kick(struct client_t *c, msg_parsing *msg);
+
+		void send_server_error(struct client_t *c);
+		void send_unknown_player(struct client_t *c);
+
+		void append_info(Player *p, struct stats_t *info);
 
 	public:	
 		struct server_error error;
@@ -68,8 +88,9 @@ class Server {
 		void reset();
 
 		bool is_running();
+		std::string get_ip();
 
-		static string get_current_ip_address();
+		static std::string get_current_ip_address();
 };
 
 void thread_server(Server *s);

@@ -1,7 +1,10 @@
+#include <string>
+
 #include <player.hpp>
 #include <debug.hpp>
 #include <common.hpp>
 #include <board.hpp>
+#include <match.hpp>
 
 void Player::set_id_start(int start) {
 	Player::id = start;
@@ -13,7 +16,7 @@ Player::Player(bool is_host) {
 	hit_shots = 0;
 	loser = false;
 	winner = false;
-	can_attack = false;
+	turn = false;
 	name.player_id = Player::id;
 	Player::id++;
 	ai = false;
@@ -21,6 +24,8 @@ Player::Player(bool is_host) {
 	own_sunk_ships = 0;
 	host = is_host;
 	ask_board = true;
+	dead = false;
+	placed_ships = false;
 }
 
 Player::~Player() {
@@ -103,17 +108,17 @@ int *Player::get_last_attack_y() {
 	return &last_y;
 }
 
-void Player::set_can_attack(bool state) {
-	this->can_attack = state;
+void Player::set_turn(bool state) {
+	this->turn = state;
 }
 
 bool Player::his_turn() {
-	return this->can_attack;
+	return this->turn;
 }
 
-void Player::add_player_to_attack(Player &p) {
+void Player::add_player_to_attack(Player *p) {
 	struct attacked_player atk = { 
-		.player_id = 0,
+		.defender = NULL,
 		.attacked = false,
 		.atk = {
 			.x = -1,
@@ -124,23 +129,24 @@ void Player::add_player_to_attack(Player &p) {
 			.back_direction = RIGHT,
 		},
 	};
-	atk.player_id = p.get_id();
+	atk.defender = p;
 	this->attacks.push_back(atk);
 }
 
-void Player::ai_attack(Player &p) {
+void Player::ai_attack(Player *p) {
 	if (!this->ai) {
 		return;
 	}
 	
 	srand(time(NULL));
 
-	Board *b = p.get_board();
+	Board *b = p->get_board();
 
 	int rand_x = 0;
 	int rand_y = 0;
 	int **board = b->get_board();
-	struct ai_last_atk *ai_atk = &get_attack_by_id(p.get_id())->atk;
+	struct attacked_player *atk = get_attack(p);
+	struct ai_last_atk *ai_atk = &atk->atk;
 
 	switch (diff) {
 		case NORMAL:
@@ -307,7 +313,7 @@ void Player::ai_attack(Player &p) {
 			if (ships[i]->point_intersect(rand_x, rand_y)) {
 				ships[i]->add_hit();
 				if (ships[i]->is_sunk()) {
-					p.dec_remaining_ships();
+					p->dec_remaining_ships();
 					if (diff == HARD) {
 						reset_ai_atk(p);
 					}
@@ -318,9 +324,9 @@ void Player::ai_attack(Player &p) {
 	}
 }
 
-void Player::reset_ai_atk(Player &p) {
+void Player::reset_ai_atk(Player *p) {
 	if (this->ai) {
-		struct attacked_player *atk = get_attack_by_id(p.get_id());
+		struct attacked_player *atk = get_attack(p);
 		if (atk != NULL) {
 			atk->atk.direction = RIGHT;
 			atk->atk.x = -1;
@@ -329,9 +335,9 @@ void Player::reset_ai_atk(Player &p) {
 	}
 }
 
-struct attacked_player *Player::get_attack_by_id(int id) {
+struct attacked_player *Player::get_attack(Player *p) {
 	for (size_t i = 0; i < attacks.size(); i++) {
-		if (attacks[i].player_id == id) {
+		if (attacks[i].defender->get_id() == p->get_id()) {
 			return &attacks[i];
 		}
 	}
@@ -399,7 +405,7 @@ void Player::inc_sunk_ships() {
 string Player::attacks_to_string() {
 	string str = "{\n";
 	for (size_t i = 0; i < attacks.size(); i++) {
-		str += "player_id: " + std::to_string(attacks[i].player_id);
+		str += "player_id: " + std::to_string(attacks[i].defender->get_id());
 		str += "\nis_attacked: " + string(attacks[i].attacked ? "true" : "false");
 		str += "\natk {\n";
 		str += "x: " + std::to_string(attacks[i].atk.x) + "\n";
@@ -417,7 +423,7 @@ string Player::get_info() {
 	string str = "PLAYER (" + name.name + ")";
 	str += "\nid: " + std::to_string(name.player_id);
 	str += "\nis_ai: " + string(ai ? "true" : "false");
-	str += "\ncan_attack: " + string(can_attack ? "true" : "false");
+	str += "\ncan_attack: " + string(turn ? "true" : "false");
 	str += "\nmissed_shots: " + std::to_string(missed_shots);
 	str += "\nhit_shots: " + std::to_string(hit_shots);
 	str += "\nsunk_ships: " + std::to_string(sunk_ships);
@@ -430,5 +436,29 @@ string Player::get_info() {
 }
 
 bool Player::is_host() {
-	return host;
+	return this->host;
+}
+
+void Player::set_death(bool state) {
+	this->dead = state;
+}
+
+bool Player::is_dead() {
+	return this->dead;
+}
+
+void Player::set_end_time() {
+	Match::set_time(this->end_time);
+}
+
+time_t Player::get_end_time() {
+	return this->end_time;
+}
+
+void Player::set_placed_ships(bool state) {
+	this->placed_ships = state;
+}
+
+bool Player::has_placed_ships() {
+	return this->placed_ships;
 }

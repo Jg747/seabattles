@@ -17,45 +17,6 @@
 using namespace std;
 
 int main() {
-	cout << "Ship\n";
-	Ship *s = new Ship(CARRIER);
-	delete s;
-	cout << "deleted\n\n";
-
-	cout << "Board\n";
-	Board *b = new Board();
-	delete b;
-	cout << "deleted\n\n";
-
-	cout << "Player\n";
-	Player *p = new Player(false);
-	delete p;
-	cout << "deleted\n\n";
-
-	cout << "Match\n";
-	Match *m = new Match();
-	delete m;
-	cout << "deleted\n\n";
-
-	cout << "GUI\n";
-	Gui *g = new Gui(NULL);
-	delete g;
-	cout << "deleted\n\n";
-	cout.flush();
-
-	cout << "Client\n";
-	Client *c = new Client();
-	delete c;
-	cout << "deleted\n\n";
-
-	cout << "Server\n";
-	Server *serv = new Server(42069);
-	delete serv;
-	cout << "deleted\n\n";
-
-	cout << "Fallimento 1\n";
-	Client *f = new Client();
-	f->create_server();
-	delete f;
+	cout << Server::get_current_ip_address();
 	return 0;
 }

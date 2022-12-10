@@ -10,7 +10,7 @@ EXT := cpp
 CC := g++
 
 # Example: -lncurses -lyaml ...
-LIBRARIES := -lncurses
+LIBRARIES := -lncurses -lcurl
 
 # Linker flags
 LFLAGS := 

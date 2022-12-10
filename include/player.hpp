@@ -11,7 +11,7 @@ class Player {
 		struct player_info name;		
 		bool ai;
 		std::vector<struct attacked_player> attacks;
-		bool can_attack;
+		bool turn;
 
 		enum game_difficulty_e diff;
 
@@ -22,6 +22,8 @@ class Player {
 		int sunk_ships;
 		int own_sunk_ships;
 
+		bool dead;
+
 		bool winner;
 		bool loser;
 
@@ -30,9 +32,11 @@ class Player {
 		int last_y;
 		bool host;
 
-		inline static int id;
+		bool placed_ships;
 
-		struct attacked_player *get_attack_by_id(int id);
+		time_t end_time;
+
+		inline static int id;
 	
 	public:
 		Player(bool is_host);
@@ -43,18 +47,23 @@ class Player {
 		Board *get_board();
 		void reset_player();
 		enum grade_e get_grade();
-		string get_name();
+		void add_player_to_attack(Player *p);
+		
 		void set_name(string name);
+		string get_name();
+		
 		void set_id(int id);
 		int get_id();
+		
 		enum game_difficulty_e get_diff();
 		void set_diff(enum game_difficulty_e diff);
-		void set_can_attack(bool state);
+		
+		void set_turn(bool state);
 		bool his_turn();
-		void add_player_to_attack(Player &p);
 
 		bool is_winner();
 		void set_winner(bool state);
+
 		bool is_loser();
 		void set_loser(bool state);
 
@@ -70,18 +79,29 @@ class Player {
 		void set_ask_board(bool state);
 		bool do_ask_board();
 
+		struct attacked_player *get_attack(Player *p);
+
 		int *get_last_attack_x();
 		int *get_last_attack_y();
 
 		bool is_ai();
 		void set_ai(bool state);
-		void ai_attack(Player &p);
-		void reset_ai_atk(Player &p);
+		void ai_attack(Player *p);
+		void reset_ai_atk(Player *p);
 
 		bool is_host();
 
+		void set_death(bool state);
+		bool is_dead();
+
+		void set_placed_ships(bool state);
+		bool has_placed_ships();
+
 		string get_info();
 		string attacks_to_string();
+
+		void set_end_time();
+		time_t get_end_time();
 };
 
 #endif

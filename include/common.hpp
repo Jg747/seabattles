@@ -101,12 +101,6 @@ struct ai_last_atk {
 	enum rotation_e back_direction;
 };
 
-struct attacked_player {
-	int player_id;
-	bool attacked;
-	struct ai_last_atk atk;
-};
-
 struct player_info {
 	std::string name;
 	int player_id;
@@ -127,6 +121,14 @@ enum attack_status_e {
 enum generic_status_e {
 	GS_OK,
 	GS_ERROR
+};
+
+class Player;
+
+struct attacked_player {
+	Player *defender;
+	bool attacked;
+	struct ai_last_atk atk;
 };
 
 #endif

@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <string>
+#include <mutex>
 
 std::string Logger::get_last_lines() {
     std::string str = "";
@@ -13,11 +14,18 @@ std::string Logger::get_last_lines() {
     return str;
 }
 
+static std::mutex m;
+
 void Logger::write(std::string str) {
+    std::unique_lock<std::mutex> lock(m);
+
     if (!Logger::log_file.is_open()) {
-        Logger::log_file.open(FILE_NAME);
+        Logger::log_file.open(FILE_NAME, std::ios::app | std::ios::ate); // TOGLIERE LE FLAGS!!!
     }
     Logger::log_file << str << "\n";
+    
+    Logger::log_file.close(); // DA RIMUOVERE!!!
+    
     if (Logger::win != NULL) {
         Logger::last_lines.push_back(str);
         if (Logger::last_lines.size() > Logger::lines) {

@@ -59,11 +59,14 @@ bool Client::start() {
         }
         return false;
     } else if (temp == 2) {
-        Logger::write("Retrying mode choice");
+        if (s != NULL && s->is_running()) {
+            s->stop();
+        }
+        Logger::write("[client] Retrying mode choice");
         return true;
     }
 
-    Logger::write("Pregame successfully passed");
+    Logger::write("[client] Pregame successfully passed");
 
     do {
         reset_fd_set();
@@ -81,19 +84,23 @@ bool Client::start() {
         }
     } while (!stop);
 
+    if (s->is_running()) {
+        s->stop();
+    }
+
     return true;
 }
 
 void Client::create_server() {
     if (s == NULL) {
         s = new Server(SERVER_PORT);
-        Logger::write("Created server (" + std::to_string(SERVER_PORT) + ")");
+        Logger::write("[client] Created server (port: " + std::to_string(SERVER_PORT) + ")");
     } else {
         delete s;
         delete t_server;
-        Logger::write("Deleted previous server");
+        Logger::write("[client] Deleted previous server");
         s = new Server(SERVER_PORT);
-        Logger::write("Created server (" + std::to_string(SERVER_PORT) + ")");
+        Logger::write("[client] Created server (port: " + std::to_string(SERVER_PORT) + ")");
     }
     t_server = new std::thread(thread_server, s);
 }
@@ -130,7 +137,18 @@ bool Client::connect_to_server(std::string ip, int port) {
         return false;
     }
 
-    return true;
+    msg_parsing msg;
+    receive_message(&msg);
+    msg_creation c_msg;
+    c_msg.msg_type = ACK;
+    send_message(&c_msg);
+
+    if (msg.msg_type == MSG_CONN_ACCEPTED) {
+        return true;
+    } else {
+        error = "[ERROR] " + string(MSG_TYPE_STR[msg.msg_type]);
+        return false;
+    }
 }
 
 void Client::send_message(msg_creation *msg) {
@@ -206,8 +224,12 @@ bool Client::do_from_socket() {
             g->set_new_board(&this->r_msg);
             break;
         
-        case MSG_MATCH_WIN:
         case MSG_MATCH_LOSE:
+            g->end_game_win(&this->r_msg);
+            g->turn(false);
+            break;
+        
+        case MSG_MATCH_WIN:
         case MSG_MATCH_END:
             g->end_game_win(&this->r_msg);
             stop = true;
@@ -230,5 +252,7 @@ std::string Client::get_error() {
 }
 
 void Client::stop_server() {
-    s->stop();
+    if (s != NULL) {
+        s->stop();
+    }
 }

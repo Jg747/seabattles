@@ -46,6 +46,8 @@ const char *MSG_TYPE_STR[] = {
 	"ACK_MSG_MATCH_INIT_MATCH",
 	"ACK_MSG_MATCH_NOT_HOST",
 	"ACK_MSG_MATCH_NOT_DEAD",
+	"ACK_MSG_SERVER_ERROR",
+	"ACK_MSG_SERVER_UNKNOWN_ID",
 
 	// Match
 	"MSG_PLAYER_LIST",
@@ -394,6 +396,18 @@ static void create_ack_match_init_match(pugi::xml_document &doc, msg_creation *m
 	add_node(data, "status", GENERIC_STATUS_STR[msg->data.ack_match_init_match.status]);
 }
 
+static void	create_ack_server_error(pugi::xml_document &doc, msg_creation *msg) {
+	pugi::xml_node data = get_data_node(doc);
+	add_node(data, "id", msg->data.ack_server_error.player_id);
+	create_ack_node(data, ACK_MSG_SERVER_ERROR);
+}
+
+static void	create_ack_server_unknown_id(pugi::xml_document &doc, msg_creation *msg) {
+	pugi::xml_node data = get_data_node(doc);
+	add_node(data, "id", msg->data.ack_server_unknown_id.player_id);
+	create_ack_node(data, ACK_MSG_SERVER_UNKNOWN_ID);
+}
+
 std::string create_message(enum msg_type_e type, msg_creation *msg) {
 	if (msg != NULL) {
 		msg->msg_type = type;
@@ -471,6 +485,12 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 		case ACK_MSG_MATCH_NOT_DEAD:
 			create_ack_match_not_dead(doc, msg);
 			break;
+		case ACK_MSG_SERVER_ERROR:
+			create_ack_server_error(doc, msg);
+			break;
+		case ACK_MSG_SERVER_UNKNOWN_ID:
+			create_ack_server_unknown_id(doc, msg);
+			break;
 		
 		case MSG_PLAYER_LIST:
 			create_player_list(doc, msg);
@@ -515,10 +535,10 @@ std::string create_message(enum msg_type_e type) {
 static enum msg_type_e get_msg_type(pugi::xml_document &doc) {
 	pugi::xml_node type = doc.child("message").child("type");
 	std::string msg_type = type.text().as_string();
-	int value;
+	int value = 0;
 
-	value = get_enum(msg_type, MSG_TYPE_STR, MSG_TYPE_STR_LEN);
 	if (msg_type != "ack") {
+		value = get_enum(msg_type, MSG_TYPE_STR, MSG_TYPE_STR_LEN);
 		if (value == -1) {
 			return UNKNOWN;
 		}
@@ -812,7 +832,6 @@ void parse_message(std::string &xml_message, msg_parsing *msg) {
 			break;
 		
 		default:
-			msg->msg_type = UNKNOWN;
 			break;
 	}
 }

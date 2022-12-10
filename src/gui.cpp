@@ -134,7 +134,7 @@ void Gui::init_gui() {
 
 	debug_window();
 
-	Logger::write("Created GUI");
+	Logger::write("[gui] Created GUI");
 }
 
 void Gui::init_game_windows() {
@@ -246,7 +246,7 @@ string Gui::get_input(WINDOW *w) {
 }
 
 void Gui::new_zone(enum input_zone_e new_zone) {
-	Logger::write("new zone: " + string(INPUT_ZONE_STR[new_zone]));
+	Logger::write("[gui] new zone: " + string(INPUT_ZONE_STR[new_zone]));
 	in_zone = new_zone;
 	print_window = true;
 }
@@ -295,13 +295,13 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 				}
 				break;
 			case '\n':
-				Logger::write("selected: " + to_string(select));
+				Logger::write("[gui] selected: " + to_string(select));
 				return select;
 				break;
 			default: break;
 		}
 
-		Logger::write("selected: no selection");
+		Logger::write("[gui] selected: no selection");
 		return -1;
 	} else {
 		select = 0;
@@ -340,7 +340,7 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 			}
 		}
 		
-		Logger::write("selected: " + to_string(select));
+		Logger::write("[gui] selected: " + to_string(select));
 		return select;
 	}
 }
@@ -418,7 +418,7 @@ int Gui::game_menu() {
 
 	debug_window();
 
-	Logger::write("now in gamemode selection");
+	Logger::write("[gui] now in gamemode selection");
 
 	return menu_cursor(start_menu[0], x/2 - 7, y/2 - 2, 3, ">", true);
 }
@@ -437,7 +437,7 @@ int Gui::diff_menu() {
 
 	debug_window();
 
-	Logger::write("now in difficulty selection");
+	Logger::write("[gui] now in difficulty selection");
 
 	return menu_cursor(start_menu[0], x/2 - 3, y/2 - 2, 4, ">", true);
 }
@@ -762,10 +762,8 @@ void Gui::view_field(Player *defender) {
 	c_msg.msg_type = MSG_PLAYER_GET_BOARD;
 	c_msg.data.player_get_board.id = defender->get_id();
 
-	do {
-		client->send_message(&c_msg);
-		client->receive_message(&r_msg);
-	} while (r_msg.msg_type != ACK_MSG_GET_BOARD);
+	client->send_message(&c_msg);
+	client->receive_message(&r_msg);
 
 	int **matrix;
 	matrix = defender->get_board()->get_board();
@@ -800,12 +798,14 @@ bool Gui::attack_at(Player *defender, int x, int y) {
 	c_msg.data.player_attack.x = x;
 	c_msg.data.player_attack.y = y;
 
-	do {
-		client->send_message(&c_msg);
-		client->receive_message(&p_msg);
-	} while (p_msg.msg_type != ACK_MSG_MATCH_ATTACK_STATUS && p_msg.msg_type != ACK_MSG_MATCH_ATTACK_ERR);
+	client->send_message(&c_msg);
+	client->receive_message(&p_msg);
 	
 	if (p_msg.msg_type == ACK_MSG_MATCH_ATTACK_ERR) {
+		return false;
+	}
+
+	if (p_msg.data.ack_match_attack_status.status == FAILED_ATTACK) {
 		return false;
 	}
 	return true;
@@ -934,12 +934,17 @@ int Gui::pregame() {
 
 		dummy = new Player(true);
 		client->create_server();
+		usleep(50000);
 		if (!client->connect_to_server(SERVER_IP, SERVER_PORT)) {
-			Logger::write("Error: " + client->get_error());
+			delete dummy;
+			Logger::write("[client] Error: " + client->get_error());
+			return 2;
 		}
 
-		if (!init_singleplayer_game((enum game_difficulty_e)value, 2)) {
-			return 1;
+		if (!init_singleplayer_game((enum game_difficulty_e)value, 1)) {
+			delete dummy;
+			Logger::write("[client] Error: " + client->get_error());
+			return 2;
 		}
     } else if (value == MULTIPLAYER) {
 		this->mode = MULTIPLAYER;
@@ -957,6 +962,18 @@ bool Gui::init_singleplayer_game(enum game_difficulty_e diff, int num_ai) {
 	msg_creation msg;
 	msg_parsing recv;
 
+	msg.msg_type = MSG_PLAYER_GET_OWN_ID;
+	msg.data.player_get_own_id.username = string(DEFAULT_PLAYER_NAME);
+	client->send_message(&msg);
+	client->receive_message(&recv);
+
+	if (recv.msg_type != ACK_MSG_PLAYER_GET_OWN_ID) {
+		return false;
+	}
+	dummy->set_name(string(DEFAULT_PLAYER_NAME));
+	dummy->set_id(recv.data.ack_player_get_own_id.player_id);
+	dummy->set_diff(diff);
+
 	msg.msg_type = MSG_HOST_INIT_MATCH;
 	msg.data.host_init_match.difficulty = diff;
 	msg.data.host_init_match.ais = num_ai;
@@ -972,18 +989,6 @@ bool Gui::init_singleplayer_game(enum game_difficulty_e diff, int num_ai) {
 	if (recv.msg_type != ACK) {
 		return false;
 	}
-
-	msg.msg_type = MSG_PLAYER_GET_OWN_ID;
-	msg.data.player_get_own_id.username = string(DEFAULT_PLAYER_NAME);
-	client->send_message(&msg);
-	client->receive_message(&recv);
-
-	if (recv.msg_type != ACK_MSG_PLAYER_GET_OWN_ID) {
-		return false;
-	}
-	dummy->set_name(string(DEFAULT_PLAYER_NAME));
-	dummy->set_id(recv.data.ack_player_get_own_id.player_id);
-	dummy->set_diff(diff);
 
 	return true;
 }
@@ -1004,10 +1009,10 @@ void Gui::game_starting() {
 void Gui::turn(bool turn) {
 	if (turn) {
 		new_zone(M_ACTIONS);
-		dummy->set_can_attack(true);
+		dummy->set_turn(true);
 	} else {
 		new_zone(M_ACTIONS_SPECTATOR);
-		dummy->set_can_attack(false);
+		dummy->set_turn(false);
 	}
 }
 

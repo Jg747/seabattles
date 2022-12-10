@@ -464,6 +464,32 @@ Inviato al client dopo aver ricevuto un `MSG_PLAYER_QUIT`
 `misses` è il numero di miss effettuati
 `sunk` è il numero di navi affondate da lui
 `remaining` è il numero delle proprie navi rimaste
+### ACK[MSG_SERVER_ERROR]
+Inviato in caso ci sia un errore interno al server (e.g. match == NULL)
+Format:
+```
+<message>
+	<type>ack</type>
+	<data>
+		<id>{id}</id>
+		<acktype>MSG_SERVER_ERROR</acktype>
+	</data>
+</message>
+```
+`id` è l'id del giocatore a cui si sta inviando il dato
+### ACK[MSG_SERVER_UNKNOWN_ID]
+Inviato in caso sia fornito l'ID di un giocatore non riconosciuto
+Format:
+```
+<message>
+	<type>ack</type>
+	<data>
+		<id>{id}</id>
+		<acktype>MSG_SERVER_UNKNOWN_ID</acktype>
+	</data>
+</message>
+```
+`id` è l'id del giocatore a cui si sta inviando il dato
 
 ## MESSAGGI INVIATI DAL SERVER
 ### MSG_PLAYER_LIST

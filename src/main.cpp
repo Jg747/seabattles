@@ -15,6 +15,7 @@ int main(int argc, char *argv[]) {
 		Client c;
 		Player::set_id_start(1);
 		while(c.start());
+		c.stop_server();
 	} catch (std::exception &e) {
 		std::cout << e.what();
 	}

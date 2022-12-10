@@ -47,6 +47,8 @@ enum msg_type_e {
 	ACK_MSG_MATCH_INIT_MATCH,
 	ACK_MSG_MATCH_NOT_HOST,
 	ACK_MSG_MATCH_NOT_DEAD,
+	ACK_MSG_SERVER_ERROR,
+	ACK_MSG_SERVER_UNKNOWN_ID,
 
 	// Messaggi del server
 	MSG_PLAYER_LIST,
@@ -174,6 +176,10 @@ struct match_got_kicked {
 	std::string reason;
 };
 
+typedef struct player_info ack_server_error_t;
+
+typedef struct player_info ack_server_unknown_id_t;
+
 struct data_union {
 	ack_generic_t ack;
 
@@ -196,6 +202,8 @@ struct data_union {
 	struct ack_match_init_match ack_match_init_match;
 	ack_match_not_host_t ack_match_not_host;
 	ack_match_not_dead_t ack_match_not_dead;
+	ack_server_error_t ack_server_error;
+	ack_server_unknown_id_t ack_server_unknown_id;
 	
 	struct msg_player_list msg_player_list;
 	struct match_player_removed match_player_removed;
