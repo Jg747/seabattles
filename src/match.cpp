@@ -117,7 +117,7 @@ void Match::start_match() {
 
 	Match::set_time(start_time);
 	(*players)[0]->set_turn(true);
-	for (int i = 1; i < players->size(); i++) {
+	for (size_t i = 1; i < players->size(); i++) {
 		(*players)[i]->set_turn(false);
 	}
 }

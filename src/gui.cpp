@@ -12,6 +12,7 @@
 #include <player.hpp>
 #include <board.hpp>
 #include <ship.hpp>
+#include <thread_manager.hpp>
 
 using std::to_string;
 
@@ -30,11 +31,12 @@ const char *INPUT_ZONE_STR[] = {
 	"M_CHOOSE_PLAYER"
 };
 
-Gui::Gui(Client *c) {
+Gui::Gui(Client *c, struct thread_manager_t *mng) {
 	init_gui();
 	in_zone = M_PRE_GAME;
 	print_window = true;
 	this->client = c;
+	this->mng = mng;
 }
 
 Gui::~Gui() {
@@ -678,7 +680,8 @@ bool Gui::send_board() {
 	}
 
 	client->send_message(&msg);
-	client->receive_message(&recv);
+	wait_for(mng, ACK);
+	recv = client->get_msg(ACK);
 
 	if (recv.msg_type == ACK) {
 		return true;
@@ -692,7 +695,8 @@ void Gui::send_forfeit(msg_parsing *msg) {
 
 	c_msg.msg_type = MSG_PLAYER_QUIT;
 	client->send_message(&c_msg);
-	client->receive_message(&r_msg);
+	wait_for(mng, MSG_MATCH_END);
+	r_msg = client->get_msg(MSG_MATCH_END);
 
 	if (msg != NULL) {
 		*msg = r_msg;
@@ -763,7 +767,8 @@ void Gui::view_field(Player *defender) {
 	c_msg.data.player_get_board.id = defender->get_id();
 
 	client->send_message(&c_msg);
-	client->receive_message(&r_msg);
+	wait_for(mng, ACK_MSG_GET_BOARD);
+	r_msg = client->get_msg(ACK_MSG_GET_BOARD);
 
 	int **matrix;
 	matrix = defender->get_board()->get_board();
@@ -799,9 +804,10 @@ bool Gui::attack_at(Player *defender, int x, int y) {
 	c_msg.data.player_attack.y = y;
 
 	client->send_message(&c_msg);
-	client->receive_message(&p_msg);
+	wait_for(mng, ACK_MSG_MATCH_ATTACK_STATUS);
+	p_msg = client->get_msg(ACK_MSG_MATCH_ATTACK_STATUS);
 	
-	if (p_msg.msg_type == ACK_MSG_MATCH_ATTACK_ERR) {
+	if (p_msg.msg_type != ACK_MSG_MATCH_ATTACK_STATUS) {
 		return false;
 	}
 
@@ -917,8 +923,6 @@ void Gui::make_actions_spectator(Player *defender) {
 }
 
 int Gui::pregame() {
-	new_zone(M_PRE_GAME);
-
 	int value = game_menu();
     if (value == 2) {
         return 0;
@@ -935,6 +939,7 @@ int Gui::pregame() {
 		dummy = new Player(true);
 		client->create_server();
 		usleep(50000);
+		
 		if (!client->connect_to_server(SERVER_IP, SERVER_PORT)) {
 			delete dummy;
 			Logger::write("[client] Error: " + client->get_error());
@@ -953,8 +958,6 @@ int Gui::pregame() {
 
     init_game_windows();
 
-	new_zone(M_NO_INPUT);
-
 	return 1;
 }
 
@@ -965,8 +968,8 @@ bool Gui::init_singleplayer_game(enum game_difficulty_e diff, int num_ai) {
 	msg.msg_type = MSG_PLAYER_GET_OWN_ID;
 	msg.data.player_get_own_id.username = string(DEFAULT_PLAYER_NAME);
 	client->send_message(&msg);
-	client->receive_message(&recv);
-
+	wait_for(mng, ACK_MSG_PLAYER_GET_OWN_ID);
+	/*recv = client->get_msg(ACK_MSG_PLAYER_GET_OWN_ID);
 	if (recv.msg_type != ACK_MSG_PLAYER_GET_OWN_ID) {
 		return false;
 	}
@@ -978,17 +981,19 @@ bool Gui::init_singleplayer_game(enum game_difficulty_e diff, int num_ai) {
 	msg.data.host_init_match.difficulty = diff;
 	msg.data.host_init_match.ais = num_ai;
 	client->send_message(&msg);
-	client->receive_message(&recv);
+	wait_for(mng, ACK_MSG_MATCH_INIT_MATCH);
+	recv = client->get_msg(ACK_MSG_MATCH_INIT_MATCH);
 	if (recv.msg_type != ACK_MSG_MATCH_INIT_MATCH || recv.data.ack_match_init_match.status != GS_OK) {
 		return false;
 	}
 
 	msg.msg_type = MSG_HOST_START_MATCH;
 	client->send_message(&msg);
-	client->receive_message(&recv);
+	wait_for(mng, ACK);
+	recv = client->get_msg(ACK);
 	if (recv.msg_type != ACK) {
 		return false;
-	}
+	}*/
 
 	return true;
 }

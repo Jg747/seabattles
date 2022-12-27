@@ -2,6 +2,7 @@
 #define __gui_h__
 
 #include <string>
+#include <list>
 #include <map>
 #ifdef _WIN32
 #include <ncurses/ncurses.h>
@@ -12,6 +13,7 @@
 #include <client.hpp>
 #include <player.hpp>
 #include <common.hpp>
+#include <thread_manager.hpp>
 
 using std::string;
 
@@ -62,7 +64,7 @@ class Client;
 
 class Gui {
 	public:
-		Gui(Client *c);
+		Gui(Client *c, struct thread_manager_t *mng);
 		~Gui();
 		
 		std::map<int, Player*> *get_player_list();
@@ -98,6 +100,8 @@ class Gui {
 		Client *client;
 		Player *dummy;
 		std::map<int, Player*> p_list;
+
+		struct thread_manager_t *mng;
 
 		void debug_window();
 

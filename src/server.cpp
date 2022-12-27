@@ -846,12 +846,6 @@ void Server::handle_host_player_kick(struct client_t *c, msg_parsing *msg) {
 	}
 }
 
-// Server thread, non toccare con quelle tue luride manine
-void thread_server(Server *s) {
-	Logger::write("[server] Starting server thread...");
-	s->start();
-}
-
 void Server::send_server_error(struct client_t *c) {
 	msg_creation msg;
 	msg.msg_type = ACK_MSG_SERVER_ERROR;
