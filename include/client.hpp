@@ -4,7 +4,7 @@
 #include <thread>
 #include <condition_variable>
 #include <mutex>
-#include <list>
+#include <vector>
 
 #include <server.hpp>
 #include <msg.hpp>
@@ -19,7 +19,7 @@ class Client {
         bool stop;
         fd_set fd_list;
         std::string error;
-        std::list<msg_parsing> msgs;
+        std::vector<msg_parsing> msgs;
 
         Gui *g;
         Server *s;
@@ -29,6 +29,10 @@ class Client {
         struct thread_manager_t *mng;
 
         void reset_player_list();
+        void handle_match_started();
+        void stop_receiver();
+        void create_receiver();
+        void wait_socket();
 
     public:
         Client(struct thread_manager_t *mng);

@@ -11,6 +11,7 @@
 #endif
 
 #include <string>
+#include <string.h>
 #include <thread>
 
 #include <debug.hpp>
@@ -34,72 +35,155 @@ Client::Client(struct thread_manager_t *mng) {
 
 Client::~Client() {
     delete g;
-    if (s != NULL) {
-        s->stop();
-        delete s;
-        s = NULL;
-        if (t_server != NULL) {
-            t_server->join();
-            delete t_server;
-        }
-        t_server = NULL;
-    }
-    if (receiver != NULL) {
-        receiver->join();
-        delete receiver;
-    }
-    receiver = NULL;
+    stop_server();
+    stop_receiver();
     if (client_socket >= 0) {
         close(client_socket);
     }
 }
 
+void Client::stop_receiver() {
+    if (receiver != NULL) {
+        this->stop = true;
+        if (receiver->joinable()) {
+            receiver->join();
+        }
+        delete receiver;
+    }
+    receiver = NULL;
+}
+
+void Client::stop_server() {
+    if (s != NULL) {
+        s->stop();
+        delete s;
+    }
+    s = NULL;
+    
+    if (t_server != NULL) {
+        if (t_server->joinable()) {
+            t_server->join();
+        }
+        delete t_server;
+    }
+    t_server = NULL;
+    
+    stop_receiver();
+}
+
 bool Client::start() {
     int temp = g->pregame();
-    return false;
     
     if (temp == 0) {
-        if (s != NULL && s->is_running()) {
-            s->stop();
-        }
+        stop_server();
+        Logger::write("[client] Program terminated");
         return false;
     } else if (temp == 2) {
-        if (s != NULL && s->is_running()) {
-            s->stop();
-        }
+        stop_server();
         Logger::write("[client] Retrying mode choice");
         return true;
     }
-
     Logger::write("[client] Pregame successfully passed");
 
-    // inizio del gioco vero e proprio
+    g->start_game();
 
-    if (s->is_running()) {
-        s->stop();
+    stop_server(); // PROBLEMA QUI
+
+    Logger::write("cose");
+
+    Logger::write("[client] Main menu");
+    return true;
+}
+
+bool Client::do_from_socket() {
+    wait_socket();
+    receive_message();
+    
+    for (size_t i = 0; i < this->msgs.size(); i++) {
+        msg_parsing r_msg = msgs[i];
+        // Messaggi che sono in attesa di essere ricevuti
+        if (r_msg.msg_type >= mng->waiting_message_low && r_msg.msg_type <= mng->waiting_message_high) {
+            unlock(mng);
+        } else {
+            // Messaggi asincroni del server
+            switch (r_msg.msg_type) {
+                case MSG_PLAYER_LIST:
+                case MSG_MATCH_PLAYER_REMOVED:
+                    reset_player_list();
+                    i--;
+                    break;
+            
+                case MSG_MATCH_STARTED:
+                    handle_match_started();
+                    i--;
+                    break;
+                case MSG_MATCH_TURN:
+                    g->turn(r_msg.data.match_turn.turn);
+                    msgs.erase(msgs.begin() + i);
+                    i--;
+                    break;
+                case MSG_MATCH_NEW_BOARD:
+                    g->set_new_board(&r_msg);
+                    msgs.erase(msgs.begin() + i);
+                    i--;
+                    break;
+                
+                case MSG_MATCH_LOSE:
+                    g->turn(false);
+                    g->end_game_win(&r_msg);
+                    msgs.erase(msgs.begin() + i);
+                    i--;
+                    break;
+                
+                case MSG_MATCH_WIN:
+                case MSG_MATCH_END:
+                    g->end_game_win(&r_msg);
+                    stop = true;
+                    msgs.erase(msgs.begin() + i);
+                    i--;
+                    break;
+
+                case MSG_MATCH_GOT_KICKED:
+                    g->got_kicked(&r_msg);
+                    stop = true;
+                    msgs.erase(msgs.begin() + i);
+                    i--;
+                    break;
+                
+                default:
+                    msgs.erase(msgs.begin() + i);
+                    i--;
+                    break;
+            }
+        }
     }
 
     return true;
 }
 
+void Client::wait_socket() {
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(client_socket, &set);
+    select(FD_SETSIZE, &set, NULL, NULL, NULL);
+}
+
 void Client::create_server() {
-    if (s == NULL) {
-        s = new Server(SERVER_PORT);
-        Logger::write("[client] Created server (port: " + std::to_string(SERVER_PORT) + ")");
-    } else {
-        delete s;
-        delete t_server;
-        Logger::write("[client] Deleted previous server");
-        s = new Server(SERVER_PORT);
-        Logger::write("[client] Created server (port: " + std::to_string(SERVER_PORT) + ")");
-    }
+    s = new Server(SERVER_PORT);
+    Logger::write("[client] Created server (port: " + std::to_string(SERVER_PORT) + ")");
     t_server = new std::thread(thread_server, s);
+}
+
+void Client::create_receiver() {
+    this->stop = false;
+    receiver = new std::thread(thread_receiver, this);
+    Logger::write("[client] New receiver created");
 }
 
 bool Client::connect_to_server(std::string ip, int port) {
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket < 0) {
-        error = "[ERROR] Socket creation failed";
+        error = "Socket creation failed";
         client_socket = -1;
         return false;
     }
@@ -109,7 +193,7 @@ bool Client::connect_to_server(std::string ip, int port) {
     address.sin_port = htons(INADDR_ANY);
     address.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(client_socket, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        error = "[ERROR] Binding failed";
+        error = "Binding failed";
         close(client_socket);
         client_socket = -1;
         return false;
@@ -122,20 +206,13 @@ bool Client::connect_to_server(std::string ip, int port) {
     address.sin_addr.s_addr = *((int*) h->h_addr_list[0]);
 
     if (connect(client_socket, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        error  = "[ERROR] Connect failed";
+        error  = "Connect failed";
         close(client_socket);
         client_socket = -1;
         return false;
     }
 
-    if (receiver != NULL) {
-        this->stop = true;
-        receiver->join();
-        delete receiver;
-        this->stop = false;
-    }
-    receiver = new std::thread(thread_receiver, this);
-    Logger::write("[client] New receiver created");
+    create_receiver();
 
     wait_for(mng, MSG_CONN_ACCEPTED, MSG_CONN_SERVER_FULL);
 
@@ -158,7 +235,7 @@ bool Client::connect_to_server(std::string ip, int port) {
     if (msg.msg_type == MSG_CONN_ACCEPTED) {
         return true;
     } else {
-        error = "[ERROR] " + string(MSG_TYPE_STR[msg.msg_type]);
+        error = string(MSG_TYPE_STR[msg.msg_type]);
 
         close(client_socket);
         client_socket = -1;
@@ -201,22 +278,22 @@ void Client::receive_message() {
 }
 
 void Client::reset_player_list() {
-    std::map<int, Player*> *list = g->get_player_list();
-    std::map<int, std::string> names;
-    std::map<int, Player*> new_list;
-
     msg_parsing msg;
     msg = get_msg(MSG_PLAYER_LIST);
     if (msg.msg_type == UNKNOWN) {
         msg = get_msg(MSG_MATCH_PLAYER_REMOVED);
     }
 
-    for (auto p : msg.data.msg_player_list.array) {
+    std::map<int, Player*> *list = g->get_player_list();
+    std::map<int, std::string> names;
+    std::map<int, Player*> new_list;
+
+    for (auto &p : msg.data.msg_player_list.array) {
         names.insert({p.player_id, p.name});
         new_list.insert({p.player_id, NULL});
     }
     
-    for (auto p : *list) {
+    for (auto &p : *list) {
         if (new_list.contains(p.first)) {
             new_list[p.first] = p.second;
         } else {
@@ -224,7 +301,7 @@ void Client::reset_player_list() {
         }
     }
 
-    for (auto p : new_list) {
+    for (auto &p : new_list) {
         if (p.second == NULL) {
             p.second = new Player(false);
             p.second->set_id(p.first);
@@ -233,88 +310,38 @@ void Client::reset_player_list() {
     }
     
     g->set_player_list(new_list);
+
+    msg_creation c_msg;
+    c_msg.msg_type = ACK;
+    send_message(&c_msg);
 }
 
 msg_parsing Client::get_msg(enum msg_type_e type) {
-    for (std::list<msg_parsing>::iterator it = msgs.begin(); it != msgs.end(); it++) {
-        if (it->msg_type == type) {
-            msg_parsing msg = *it;
-            msgs.erase(it);
+    for (size_t i = 0; i < this->msgs.size(); i++) {
+        if (msgs[i].msg_type == type) {
+            msg_parsing msg = msgs[i];
+            msgs.erase(msgs.begin() + i);
             return msg;
         }
     }
-    return { .msg_type = UNKNOWN };
+    msg_parsing m;
+    m.msg_type = UNKNOWN;
+    return m;
 }
 
-bool Client::do_from_socket() {
-    receive_message();
+void Client::handle_match_started() {
+    msg_parsing r_msg = get_msg(MSG_MATCH_STARTED);
+    msg_creation msg;
+    msg.msg_type = ACK;
+    send_message(&msg);
     
-    for (std::list<msg_parsing>::iterator it = msgs.begin(); it != msgs.end(); it++) {
-        msg_parsing r_msg = *it;
-
-        // Messaggi che sono in attesa di essere ricevuti
-        if (r_msg.msg_type >= mng->waiting_message_low && r_msg.msg_type <= mng->waiting_message_high) {
-            unlock(mng);
-        }
-
-        // Messaggi asincroni del server
-        switch (r_msg.msg_type) {
-            case MSG_PLAYER_LIST:
-            case MSG_MATCH_PLAYER_REMOVED:
-                reset_player_list();
-                msgs.erase(it);
-                break;
-        
-            case MSG_MATCH_STARTED:
-                g->game_starting();
-                msgs.erase(it);
-                break;
-            case MSG_MATCH_TURN:
-                g->turn(r_msg.data.match_turn.turn);
-                msgs.erase(it);
-                break;
-            case MSG_MATCH_NEW_BOARD:
-                g->set_new_board(&r_msg);
-                msgs.erase(it);
-                break;
-            
-            case MSG_MATCH_LOSE:
-                g->end_game_win(&r_msg);
-                g->turn(false);
-                msgs.erase(it);
-                break;
-            
-            case MSG_MATCH_WIN:
-            case MSG_MATCH_END:
-                g->end_game_win(&r_msg);
-                stop = true;
-                msgs.erase(it);
-                break;
-
-            case MSG_MATCH_GOT_KICKED:
-                g->got_kicked(&r_msg);
-                stop = true;
-                msgs.erase(it);
-                break;
-            
-            default:
-                break;
-        }
-    }
-
-    return true;
+    g->game_starting();
 }
 
 bool Client::is_stop() {
-    return stop;
+    return this->stop;
 }
 
 std::string Client::get_error() {
     return this->error;
-}
-
-void Client::stop_server() {
-    if (s != NULL) {
-        s->stop();
-    }
 }

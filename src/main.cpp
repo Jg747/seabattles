@@ -1,6 +1,7 @@
 /*
 Cose da sistemare alla fine:
 - debug: sistemare il file
+- server: scommentare la get_ip nel costruttore
 */
 
 #include <iostream>

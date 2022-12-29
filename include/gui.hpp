@@ -71,6 +71,7 @@ class Gui {
 		void set_player_list(std::map<int, Player*> player_list);
 
 		int pregame();
+		void start_game();
 		bool do_from_input();
 
 		void game_starting();
@@ -91,11 +92,6 @@ class Gui {
 		WINDOW *debug_win[2];
 
 		enum gamemode_e mode;
-		bool print_window;
-		enum input_zone_e in_zone;
-		int value;
-		int select;
-		void new_zone(enum input_zone_e new_zone);
 
 		Client *client;
 		Player *dummy;
@@ -122,8 +118,9 @@ class Gui {
 		int diff_menu();
 		int actions_menu(enum action_e a);
 
+		void ask_board(Player *p, bool lost);
 		bool send_board();
-		int place_ships();
+		bool place_ships();
 		int place_a_ship(int index);
 		void paint_ship(int index);
 
@@ -131,9 +128,9 @@ class Gui {
 		void paint_placement_sea();
 		
 		void send_forfeit(msg_parsing *msg);
-		void make_actions(Player *defender);
-		void make_actions_spectator(Player *defender);
-		
+		void make_actions();
+		void make_actions_spectator();
+
 		void view_field(Player *defender);
 		bool attack_at(Player *defender, int x, int y);
 		void paint_attack(int **board, int x, int y);
