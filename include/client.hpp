@@ -17,7 +17,6 @@ class Client {
     private:
         int client_socket;
         bool stop;
-        fd_set fd_list;
         std::string error;
         std::vector<msg_parsing> msgs;
 

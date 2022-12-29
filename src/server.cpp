@@ -362,19 +362,21 @@ void Server::handle_player_ship_placement(struct client_t *c, msg_parsing *msg) 
 	bool error = false;
 	int j;
 	for (int i = 0; i < SHIPS_COUNT; i++) {
-		Ship *s;
+		Ship *s = NULL;
 		for (j = 0; j < SHIPS_COUNT; j++) {
 			if (ships[j]->get_type() == msg->data.player_ship_placement.array[i].type) {
 				s = ships[j];
 				break;
 			}
 		}
-		s->set_x(msg->data.player_ship_placement.array[i].x);
-		s->set_y(msg->data.player_ship_placement.array[i].y);
-		s->set_rotation(msg->data.player_ship_placement.array[i].rotation);
-		if (!b->insert_ship(j, PLACE)) {
-			error = true;
-			break;
+		if (s != NULL) {
+			s->set_x(msg->data.player_ship_placement.array[i].x);
+			s->set_y(msg->data.player_ship_placement.array[i].y);
+			s->set_rotation(msg->data.player_ship_placement.array[i].rotation);
+			if (!b->insert_ship(j, PLACE)) {
+				error = true;
+				break;
+			}
 		}
 	}
 
