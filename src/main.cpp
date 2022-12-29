@@ -7,10 +7,14 @@ Cose da sistemare alla fine:
 #include <iostream>
 #include <mutex>
 #include <chrono>
+#include <csignal>
 
 #include <debug.hpp>
 #include <player.hpp>
 #include <client.hpp>
+#include <sig_handlers.hpp>
+
+Client *c;
 
 int main(int argc, char *argv[]) {
 	Logger::debug = true;
@@ -19,17 +23,19 @@ int main(int argc, char *argv[]) {
 	srand(time(&seed));
 
 	struct thread_manager_t mng;
+	init_signals();
+	c = NULL;
 
 	try {
-		Client c(&mng);
+		c = new Client(&mng);
 		Player::set_id_start(1);
-		while(c.start());
-		c.stop_server();
+		while(c->start());
+		c->stop_server();
 	} catch (std::exception &e) {
 		std::cout << e.what();
 	}
 
-	Logger::stop();
+	stop_program();
     
 	return 0;
 }
