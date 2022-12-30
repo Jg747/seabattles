@@ -90,7 +90,6 @@ class Server {
 
 		bool start();
 		void stop();
-		void reset();
 
 		bool is_running();
 		std::string get_ip();

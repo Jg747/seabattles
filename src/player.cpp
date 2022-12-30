@@ -10,6 +10,24 @@ void Player::set_id_start(int start) {
 	Player::id = start;
 }
 
+Player::Player() {
+	b = new Board();
+	missed_shots = 0;
+	hit_shots = 0;
+	loser = false;
+	winner = false;
+	turn = false;
+	name.player_id = Player::id;
+	Player::id++;
+	ai = false;
+	sunk_ships = 0;
+	own_sunk_ships = 0;
+	host = false;
+	ask_board = true;
+	dead = false;
+	placed_ships = false;
+}
+
 Player::Player(bool is_host) {
 	b = new Board();
 	missed_shots = 0;

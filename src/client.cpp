@@ -34,43 +34,39 @@ Client::Client(struct thread_manager_t *mng) {
 }
 
 Client::~Client() {
-    delete g;
+    if (g != NULL) {
+        delete g;
+        g = NULL;
+    }
     stop_server();
-    stop_receiver();
     if (client_socket >= 0) {
         close(client_socket);
     }
 }
 
-// ANCHE QUESTA FUNZIONE MI STA SULLE PALLE
 void Client::stop_receiver() {
     if (receiver != NULL) {
         this->stop = true;
-        if (receiver->joinable()) {
-            receiver->join();
-        }
+        receiver->join();
         delete receiver;
+        receiver = NULL;
     }
-    receiver = NULL;
 }
 
 // QUESTA FUNZIONE MI STA SULLE PALLE
 void Client::stop_server() {
+    stop_receiver();
+    
     if (s != NULL) {
         s->stop();
-        delete s;
-    }
-    s = NULL;
-    
-    if (t_server != NULL) {
-        if (t_server->joinable()) {
+        if (t_server != NULL) {
             t_server->join();
+            delete t_server;
+            t_server = NULL;
         }
-        delete t_server;
+        delete s;
+        s = NULL;
     }
-    t_server = NULL;
-    
-    stop_receiver();
 }
 
 bool Client::start() {
@@ -89,73 +85,72 @@ bool Client::start() {
 
     g->start_game();
 
-    stop_server(); // PROBLEMA QUI
-
-    Logger::write("cose");
+    stop_server();
 
     Logger::write("[client] Main menu");
     return true;
 }
 
 bool Client::do_from_socket() {
-    wait_socket();
-    receive_message();
-    
-    for (size_t i = 0; i < this->msgs.size(); i++) {
-        msg_parsing r_msg = msgs[i];
-        // Messaggi che sono in attesa di essere ricevuti
-        if (r_msg.msg_type >= mng->waiting_message_low && r_msg.msg_type <= mng->waiting_message_high) {
-            unlock(mng);
-        } else {
-            // Messaggi asincroni del server
-            switch (r_msg.msg_type) {
-                case MSG_PLAYER_LIST:
-                case MSG_MATCH_PLAYER_REMOVED:
-                    reset_player_list();
-                    i--;
-                    break;
-            
-                case MSG_MATCH_STARTED:
-                    handle_match_started();
-                    i--;
-                    break;
-                case MSG_MATCH_TURN:
-                    g->turn(r_msg.data.match_turn.turn);
-                    msgs.erase(msgs.begin() + i);
-                    i--;
-                    break;
-                case MSG_MATCH_NEW_BOARD:
-                    g->set_new_board(&r_msg);
-                    msgs.erase(msgs.begin() + i);
-                    i--;
-                    break;
-                
-                case MSG_MATCH_LOSE:
-                    g->turn(false);
-                    g->end_game_win(&r_msg);
-                    msgs.erase(msgs.begin() + i);
-                    i--;
-                    break;
-                
-                case MSG_MATCH_WIN:
-                case MSG_MATCH_END:
-                    g->end_game_win(&r_msg);
-                    stop = true;
-                    msgs.erase(msgs.begin() + i);
-                    i--;
-                    break;
+    if (wait_socket()) {
+        receive_message();
 
-                case MSG_MATCH_GOT_KICKED:
-                    g->got_kicked(&r_msg);
-                    stop = true;
-                    msgs.erase(msgs.begin() + i);
-                    i--;
-                    break;
+        for (size_t i = 0; i < this->msgs.size(); i++) {
+            msg_parsing r_msg = msgs[i];
+            // Messaggi che sono in attesa di essere ricevuti
+            if (r_msg.msg_type >= mng->waiting_message_low && r_msg.msg_type <= mng->waiting_message_high) {
+                unlock(mng);
+            } else {
+                // Messaggi asincroni del server
+                switch (r_msg.msg_type) {
+                    case MSG_PLAYER_LIST:
+                    case MSG_MATCH_PLAYER_REMOVED:
+                        reset_player_list();
+                        i--;
+                        break;
                 
-                default:
-                    msgs.erase(msgs.begin() + i);
-                    i--;
-                    break;
+                    case MSG_MATCH_STARTED:
+                        handle_match_started();
+                        i--;
+                        break;
+                    case MSG_MATCH_TURN:
+                        g->turn(r_msg.data.match_turn.turn);
+                        msgs.erase(msgs.begin() + i);
+                        i--;
+                        break;
+                    case MSG_MATCH_NEW_BOARD:
+                        g->set_new_board(&r_msg);
+                        msgs.erase(msgs.begin() + i);
+                        i--;
+                        break;
+                    
+                    case MSG_MATCH_LOSE:
+                        g->turn(false);
+                        g->end_game_win(&r_msg);
+                        msgs.erase(msgs.begin() + i);
+                        i--;
+                        break;
+                    
+                    case MSG_MATCH_WIN:
+                    case MSG_MATCH_END:
+                        g->end_game_win(&r_msg);
+                        stop = true;
+                        msgs.erase(msgs.begin() + i);
+                        i--;
+                        break;
+
+                    case MSG_MATCH_GOT_KICKED:
+                        g->got_kicked(&r_msg);
+                        stop = true;
+                        msgs.erase(msgs.begin() + i);
+                        i--;
+                        break;
+                    
+                    default:
+                        msgs.erase(msgs.begin() + i);
+                        i--;
+                        break;
+                }
             }
         }
     }
@@ -163,11 +158,17 @@ bool Client::do_from_socket() {
     return true;
 }
 
-void Client::wait_socket() {
+bool Client::wait_socket() {
     fd_set set;
+    struct timeval t = { .tv_sec = 0, .tv_usec = 500000 };
     FD_ZERO(&set);
     FD_SET(client_socket, &set);
-    select(FD_SETSIZE, &set, NULL, NULL, NULL);
+    if (select(FD_SETSIZE, &set, NULL, NULL, &t) > 0) {
+        if (FD_ISSET(client_socket, &set)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Client::create_server() {

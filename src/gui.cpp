@@ -928,13 +928,15 @@ int Gui::pregame() {
             return 2;
         }
 
-		dummy = new Player(true);
+		dummy = new Player();
+		creating_server_win();
 		client->create_server();
-		usleep(50000);
+		usleep(500000);
 		
 		if (!client->connect_to_server(SERVER_IP, SERVER_PORT)) {
 			delete dummy;
 			Logger::write("[client][ERROR] " + client->get_error());
+			client->stop_server();
 			conn_err(NULL);
 			return 2;
 		}
@@ -942,6 +944,7 @@ int Gui::pregame() {
 		if (!init_singleplayer_game((enum game_difficulty_e)value, 1)) {
 			delete dummy;
 			Logger::write("[client][ERROR] " + client->get_error());
+			client->stop_server();
 			return 2;
 		}
     } else if (value == MULTIPLAYER) {
@@ -1006,6 +1009,19 @@ void Gui::game_starting() {
 	wrefresh(start_menu[0]);
 	debug_window();
 	sleep(1);
+}
+
+void Gui::creating_server_win() {
+	box(start_menu[1], ACS_VLINE, ACS_HLINE);
+	int width, height;
+	get_win_size(start_menu[0], width, height);
+	
+	std::string temp = "Creating server......";
+	mvwrite_on_window(start_menu[0], width/2 - temp.length()/2, height/2, temp);
+
+	wrefresh(start_menu[1]);
+	wrefresh(start_menu[0]);
+	debug_window();
 }
 
 void Gui::turn(bool turn) {

@@ -31,7 +31,7 @@ class Client {
         void handle_match_started();
         void stop_receiver();
         void create_receiver();
-        void wait_socket();
+        bool wait_socket();
 
     public:
         Client(struct thread_manager_t *mng);

@@ -72,7 +72,6 @@ class Gui {
 
 		int pregame();
 		void start_game();
-		bool do_from_input();
 
 		void game_starting();
 		void turn(bool turn);
@@ -139,6 +138,8 @@ class Gui {
 		void write_fleet_type(string who);
 		void paint_actions_menu(enum action_e a, int &width, int &height);
 		void color_tile(int i, int j, enum colors color);
+
+		void creating_server_win();
 
 		int multi_menu();
 		void wait_conn_menu();

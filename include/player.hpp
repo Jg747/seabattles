@@ -39,6 +39,7 @@ class Player {
 		inline static int id;
 	
 	public:
+		Player();
 		Player(bool is_host);
 		~Player();
 

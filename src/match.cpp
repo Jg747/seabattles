@@ -44,10 +44,9 @@ Match::Match() {
 }
 
 Match::~Match() {
-	for (auto p : *players) {
-		delete p;
+	if (players != NULL) {
+		delete players;
 	}
-	delete players;
 }
 
 bool Match::add_player(Player *p) {

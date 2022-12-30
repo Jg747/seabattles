@@ -61,18 +61,27 @@ Server::Server(int port) {
 
 Server::~Server() {
 	if (clients != NULL) {
-		for (auto &c : *clients) {
+		for (size_t i = 0; i < clients->size(); i++) {
+			struct client_t *c = clients->at(i);
 			if (c->client_socket >= 0) {
 				close(c->client_socket);
-				delete c->p;
+				if (c->p != NULL) {
+					delete c->p;
+					c->p = NULL;
+				}
 			}
-			delete c;
+			if (c != NULL) {
+				delete c;
+				c = NULL;
+			}
 		}
 		delete clients;
+		clients = NULL;
 	}
 
 	if (m != NULL) {
 		delete m;
+		m = NULL;
 	}
 
 	if (server_socket >= 0) {
@@ -98,9 +107,10 @@ bool Server::start() {
 	clients = new std::vector<struct client_t*>();
 	create_match();
 	
+	struct timeval t = { .tv_sec = 0, .tv_usec = 500000 };
 	while (!stop_serv) {
 		reset_fd_set();
-		if (select(FD_SETSIZE, &sock_list, NULL, NULL, NULL) >= 0) {
+		if (select(FD_SETSIZE, &sock_list, NULL, NULL, &t) > 0) {
 			if (FD_ISSET(server_socket, &sock_list)) {
 				add_new_client();
 			}
@@ -159,22 +169,6 @@ void Server::receive_message(struct client_t *c) {
 
 void Server::stop() {
 	this->stop_serv = true;
-}
-
-void Server::reset() {
-	if (m != NULL) {
-		delete m;
-	}
-
-	for (auto &c : *clients) {
-		if (c->client_socket >= 0) {
-			close(c->client_socket);
-			delete c->p;
-		}
-	}
-	delete clients;
-
-	Logger::write("[server] Server reset");
 }
 
 bool Server::add_new_client() {
