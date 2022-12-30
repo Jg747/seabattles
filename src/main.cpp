@@ -2,6 +2,8 @@
 Cose da sistemare alla fine:
 - debug: sistemare il file
 - server: scommentare la get_ip nel costruttore
+- signal_handlers: fixare i vari signal handlers per chiudere decentemente il programma in caso di crash
+- gui: gestire in caso di resize
 */
 
 #include <iostream>

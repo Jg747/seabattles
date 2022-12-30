@@ -42,6 +42,7 @@ Client::~Client() {
     }
 }
 
+// ANCHE QUESTA FUNZIONE MI STA SULLE PALLE
 void Client::stop_receiver() {
     if (receiver != NULL) {
         this->stop = true;
@@ -53,6 +54,7 @@ void Client::stop_receiver() {
     receiver = NULL;
 }
 
+// QUESTA FUNZIONE MI STA SULLE PALLE
 void Client::stop_server() {
     if (s != NULL) {
         s->stop();
