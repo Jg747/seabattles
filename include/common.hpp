@@ -43,6 +43,16 @@ enum rotation_e {
 	LEFT = 0x03
 };
 
+enum command_e {
+	MOVE_UP,
+	MOVE_RIGHT,
+	MOVE_DOWN,
+	MOVE_LEFT,
+	ROTATE,
+	PLACE,
+	REMOVE
+};
+
 enum action_e {
 	PLACE_SHIPS,
 	PLACE_A_SHIP,
@@ -53,16 +63,6 @@ enum action_e {
 	ALLY,
 	ATTACK,
 	FORFEIT
-};
-
-enum command_e {
-	MOVE_UP,
-	MOVE_RIGHT,
-	MOVE_DOWN,
-	MOVE_LEFT,
-	ROTATE,
-	PLACE,
-	REMOVE
 };
 
 enum game_status_e {

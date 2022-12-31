@@ -16,21 +16,6 @@
 
 using std::to_string;
 
-const char *INPUT_ZONE_STR[] = {
-	"M_NO_INPUT",
-	"M_WAIT_KEY_SEE_FIELD",
-	"M_SEE_FIELD",
-	"M_PRE_GAME",
-	"M_PLACE_SHIPS",
-	"M_PLACE_A_SHIP",
-	"M_MULTI_MODE",
-	"M_ACTIONS",
-	"M_ACTIONS_SPECTATOR",
-	"M_FORFEIT",
-	"M_ATTACK",
-	"M_CHOOSE_PLAYER"
-};
-
 Gui::Gui(Client *c, struct thread_manager_t *mng) {
 	init_gui();
 	this->client = c;
@@ -77,23 +62,16 @@ void Gui::init_gui() {
 	initscr();
 	start_color();
 	
-	init_pair((short)COLOR_DEFAULT, COLOR_WHITE, COLOR_BLACK);
+	init_pair((short)COLOR_SHIP, COLOR_WHITE, COLOR_WHITE);
 	init_pair((short)COLOR_BLUE_TILE, COLOR_BLUE, COLOR_BLUE);
 	init_pair((short)COLOR_AQUA_TILE, COLOR_CYAN, COLOR_CYAN);
-	init_pair((short)COLOR_SHIP, COLOR_WHITE, COLOR_WHITE);
-	init_pair((short)COLOR_HIT, COLOR_YELLOW, COLOR_YELLOW);
 	init_pair((short)COLOR_NOT_HIT, COLOR_RED, COLOR_RED);
-	init_pair((short)COLOR_SUNK, COLOR_GREEN, COLOR_GREEN);
-	init_pair((short)COLOR_CORRECT_PLACE, COLOR_GREEN, COLOR_GREEN);
-	init_pair((short)COLOR_INCORRECT_PLACE, COLOR_RED, COLOR_RED);
+	init_pair((short)COLOR_HIT, COLOR_YELLOW, COLOR_YELLOW);
+	init_pair((short)COLOR_SELECT_PLACE, COLOR_GREEN, COLOR_GREEN);
 	init_pair((short)COLOR_SELECT_HIT, COLOR_MAGENTA, COLOR_MAGENTA);
-	init_pair((short)COLOR_ALREADY_HIT, COLOR_WHITE, COLOR_WHITE);
-	init_pair((short)COLOR_TEXT_GREEN, COLOR_GREEN, COLOR_BLACK);
-	init_pair((short)COLOR_TEXT_RED, COLOR_RED, COLOR_BLACK);
 
 	curs_set(0);
 	noecho();
-	bkgd(COLOR_PAIR(COLOR_DEFAULT));
 
 	//Borders
 	game_wrapper[1] = newwin(LINES, COLS, 0, 0);
@@ -184,7 +162,7 @@ void Gui::init_sea() {
 	int row_name = 1;
 	bool blue = true;
 
-	write_fleet_type("YOUR");
+	write_fleet_type("Your");
 
 	for (int i = 0; i < BOARD_SIZE + 1; i++) {
 		x = 2 + x_off;
@@ -209,7 +187,6 @@ void Gui::init_sea() {
 				mvwrite_on_window(sea[i][j], x_inc/2, y_inc/2, to_string(row_name));
 				row_name++;
 			}
-			wrefresh(sea[i][j]);
 			x += x_inc;
 		}
 		blue = !blue;
@@ -244,12 +221,6 @@ string Gui::get_input(WINDOW *w) {
 	keypad(w, false);
 	return buf;
 }
-
-/*void Gui::new_zone(enum input_zone_e new_zone) {
-	Logger::write("[gui] new zone: " + string(INPUT_ZONE_STR[new_zone]));
-	in_zone = new_zone;
-	print_window = true;
-}*/
 
 void Gui::get_win_size(WINDOW *w, int &width, int &height) {
 	getmaxyx(w, height, width);
@@ -305,7 +276,11 @@ int Gui::menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool 
 void Gui::write_fleet_type(string who) {
 	int width, height;
 	get_win_size(sea_border[0], width, height);
-	mvwrite_on_window(sea_border[0], width/2 - 5 < 0 ? 0 : width/2 - 5, 0, string(who + " fleet"));
+	int w = width/2 - 5 < 0 ? 0 : width/2 - 5;
+	if (Logger::debug) {
+		w -= width/4;
+	}
+	mvwrite_on_window(sea_border[0], w, 0, string(who + " fleet"));
 	wrefresh(sea_border[0]);
 }
 
@@ -317,40 +292,38 @@ void Gui::paint_placement_sea() {
 	int **board = dummy->get_board()->get_board();
 	Ship **ships = dummy->get_board()->get_ships();
 
-	write_fleet_type("Your");
 	get_win_size(sea[0][0], width, height);
 	
 	// SEGMENTATION FAULT
-	for (i = 1; i < BOARD_SIZE + 1; i++) {
-		for (j = 1; j < BOARD_SIZE + 1; j++) {
+	for (i = 0; i < BOARD_SIZE; i++) {
+		for (j = 0; j < BOARD_SIZE; j++) {
 			if (height > 1) {
-				box(sea[i][j], ACS_VLINE, ACS_HLINE);
+				box(sea[i+1][j+1], ACS_VLINE, ACS_HLINE);
 			}
-			if (board[i-1][j-1] > 0) {
-				if (board[i-1][j-1] == DAMAGE) {
-					wbkgd(sea[i][j], COLOR_PAIR(COLOR_NOT_HIT));
-				} else if (board[i-1][j-1] > DAMAGE) {
+			if (board[i][j] > 0) {
+				if (board[i][j] == DAMAGE) {
+					wbkgd(sea[i+1][j+1], COLOR_PAIR(COLOR_NOT_HIT));
+				} else if (board[i][j] > DAMAGE) {
 					for (k = 0; k < SHIPS_COUNT; k++) {
-						if (ships[k]->point_intersect(j-1, i-1)) {
+						if (ships[k]->point_intersect(j, i)) {
 							break;
 						}
 					}
 					if (ships[k]->is_sunk()) {
-						wbkgd(sea[i][j], COLOR_PAIR(COLOR_SUNK));
+						wbkgd(sea[i+1][j+1], COLOR_PAIR(COLOR_SUNK));
 					} else {
-						wbkgd(sea[i][j], COLOR_PAIR(COLOR_HIT));
+						wbkgd(sea[i+1][j+1], COLOR_PAIR(COLOR_HIT));
 					}
 				} else {
-					wbkgd(sea[i][j], COLOR_PAIR(COLOR_SHIP));
+					wbkgd(sea[i+1][j+1], COLOR_PAIR(COLOR_SHIP));
 				}
 			} else {
 				if (blue) {
-					wbkgd(sea[i][j], COLOR_PAIR(COLOR_BLUE_TILE));
+					wbkgd(sea[i+1][j+1], COLOR_PAIR(COLOR_BLUE_TILE));
 				} else {
-					wbkgd(sea[i][j], COLOR_PAIR(COLOR_AQUA_TILE));
+					wbkgd(sea[i+1][j+1], COLOR_PAIR(COLOR_AQUA_TILE));
 				}
 			}
-			wrefresh(sea[i][j]);
 			blue = !blue;
 		}
 		if (BOARD_SIZE % 2 == 0) {
@@ -358,6 +331,13 @@ void Gui::paint_placement_sea() {
 		}
 	}
 	//-------
+
+	for (int i = 0; i < BOARD_SIZE + 1; i++) {
+		for (int j = 0; j < BOARD_SIZE + 1; j++) {
+			wrefresh(sea[i][j]);
+		}
+	}
+	write_fleet_type("Your");
 
 	debug_window();
 }
@@ -471,6 +451,7 @@ void Gui::paint_actions_menu(enum action_e a, int &width, int &height) {
 			break;
 	}
 
+	wrefresh(actions[1]);
 	wrefresh(actions[0]);
 	debug_window();
 }
@@ -596,6 +577,7 @@ int Gui::place_a_ship(int index) {
 				paint_ship(index);
 				break;
 			case 'c':
+				paint_placement_sea();
 				return -1;
 				break;
 		}
@@ -604,6 +586,8 @@ int Gui::place_a_ship(int index) {
 	ch = b->insert_ship(index, PLACE);
 	if (ch) {
 		paint_ship(index);
+	} else {
+		paint_placement_sea();
 	}
 
 	return ch;
@@ -654,6 +638,7 @@ bool Gui::place_ships() {
 
 	get_win_size(actions[0], width, height);
 
+	paint_placement_sea();
 	while (!confirm) {
 		choice = actions_menu(PLACE_SHIPS);
 		if (choice == 5) {
@@ -683,7 +668,6 @@ bool Gui::place_ships() {
 			exit_loop = 0;
 			while (!exit_loop) {
 				exit_loop = place_a_ship(choice);
-				paint_placement_sea();
 			}
 		}
 	}
@@ -952,10 +936,10 @@ int Gui::pregame() {
 		this->mode = MULTIPLAYER;
         // ...
     }
-
-    init_game_windows();
-
 	game_starting();
+
+	usleep(500000);
+	init_game_windows();
 
 	return 1;
 }
@@ -1008,7 +992,7 @@ void Gui::game_starting() {
 	wrefresh(start_menu[1]);
 	wrefresh(start_menu[0]);
 	debug_window();
-	sleep(1);
+	usleep(1000000);
 }
 
 void Gui::creating_server_win() {
@@ -1176,7 +1160,7 @@ void Gui::set_player_list(std::map<int, Player*> player_list) {
 }
 
 void Gui::start_game() {
-	Logger::write("PLACEHOLDER");
+	place_ships();
 }
 
 /************************************************/

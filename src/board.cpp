@@ -13,6 +13,7 @@ Board::Board() {
 		this->ships[i] = new Ship(i);
 	}
 	this->ships_remaining = 0;
+	reset_board();
 	assign_ids();
 }
 
@@ -41,6 +42,7 @@ void Board::reset_board() {
 		ships[i]->set_x(0);
 		ships[i]->set_y(BOARD_SIZE - 1);
 		ships[i]->reset_hits();
+		ships[i]->set_placed(false);
 	}
 	this->ships_remaining = 0;
 }
@@ -161,7 +163,7 @@ bool Board::check_intersection(Ship *&ship) {
 			}
 			break;
 		case RIGHT:
-			for (int i = ship->get_x(); i < ship->get_y() + ship->get_len(); i++) {
+			for (int i = ship->get_x(); i < ship->get_x() + ship->get_len(); i++) {
 				if (board[ship->get_y()][i] > 0) {
 					return false;
 				}

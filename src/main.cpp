@@ -4,6 +4,8 @@ Cose da sistemare alla fine:
 - server: scommentare la get_ip nel costruttore
 - signal_handlers: fixare i vari signal handlers per chiudere decentemente il programma in caso di crash
 - gui: gestire in caso di resize
+- gui: per qualche ragione non ci sono i box() nelle celle sea[][] se height > 1
+- gui: a game finito bisogna eliminare tutte le window e ricrearle [creare un clear_windows()]
 */
 
 #include <iostream>

@@ -20,7 +20,8 @@ void Logger::write(std::string str) {
     std::unique_lock<std::mutex> lock(m);
 
     if (!Logger::log_file.is_open()) {
-        Logger::log_file.open(FILE_NAME, std::ios::app | std::ios::ate); // TOGLIERE LE FLAGS!!!
+        Logger::log_file.open(FILE_NAME, std::ios::app | std::ios::ate);
+        //Logger::log_file.open(FILE_NAME);
     }
     Logger::log_file << str << "\n";
     
