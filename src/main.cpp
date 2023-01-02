@@ -32,7 +32,6 @@ int main(int argc, char *argv[]) {
 
 	try {
 		c = new Client(&mng);
-		Player::set_id_start(1);
 		while(c->start());
 	} catch (std::exception &e) {
 		std::cout << e.what();

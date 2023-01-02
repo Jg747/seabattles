@@ -23,6 +23,8 @@ is going to be your server
 #include <common.hpp>
 #include <msg.hpp>
 #include <gui.hpp>
+#include <player.hpp>
+#include <ai.hpp>
 
 Server::Server(int port) {
 	if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -238,12 +240,14 @@ bool Server::handle_client_request(struct client_t *c) {
 			case MSG_PLAYER_GET_OWN_ID:
 				handle_player_get_own_id(c, &msg);
 				break;
+			case MSG_DEBUG_SHIP_PLACEMENT:
 			case MSG_PLAYER_SHIP_PLACEMENT:
 				handle_player_ship_placement(c, &msg);
 				break;
 			case MSG_PLAYER_GET_BOARD:
 				handle_player_get_board(c, &msg);
 				break;
+			case MSG_DEBUG_GET_BOARD:
 			case MSG_PLAYER_GET_BOARD_LOST:
 				handle_player_get_board_lost(c, &msg);
 				break;
@@ -302,6 +306,17 @@ string Server::get_current_ip_address() {
 	}
 }
 
+msg_parsing Server::get_msg(struct client_t *c, enum msg_type_e type) {
+    for (size_t i = 0; i < c->msgs.size(); i++) {
+        if (c->msgs[i].msg_type == type) {
+            msg_parsing msg = c->msgs[i];
+            c->msgs.erase(c->msgs.begin() + i);
+            return msg;
+        }
+    }
+    return { .msg_type = UNKNOWN };
+}
+
 void Server::handle_player_get_own_id(struct client_t *c, msg_parsing *msg) {
 	if (m == NULL) {
 		send_server_error(c);
@@ -317,31 +332,12 @@ void Server::handle_player_get_own_id(struct client_t *c, msg_parsing *msg) {
 	msg_creation player_list;
 	msg_parsing r_msg;
 	player_list.msg_type = MSG_PLAYER_LIST;
-	std::vector<Player*> *players = m->get_players();
-	for (auto &p : *players) {
-		if (!p->is_dead()) {
-			struct player_info info;
-			info.name = p->get_name();
-			info.player_id = p->get_id();
-			player_list.data.msg_player_list.array.push_back(info);
-		}
-	}
+	append_player_list(&player_list.data.msg_player_list);
 
 	for (auto &p : *clients) {
 		send_message(p->client_socket, &player_list);
 		//receive_message(p->client_socket, &r_msg);
 	}
-}
-
-msg_parsing Server::get_msg(struct client_t *c, enum msg_type_e type) {
-    for (size_t i = 0; i < c->msgs.size(); i++) {
-        if (c->msgs[i].msg_type == type) {
-            msg_parsing msg = c->msgs[i];
-            c->msgs.erase(c->msgs.begin() + i);
-            return msg;
-        }
-    }
-    return { .msg_type = UNKNOWN };
 }
 
 void Server::handle_player_ship_placement(struct client_t *c, msg_parsing *msg) {
@@ -367,11 +363,15 @@ void Server::handle_player_ship_placement(struct client_t *c, msg_parsing *msg) 
 			s->set_x(msg->data.player_ship_placement.array[i].x);
 			s->set_y(msg->data.player_ship_placement.array[i].y);
 			s->set_rotation(msg->data.player_ship_placement.array[i].rotation);
-			if (!b->insert_ship(j, PLACE)) {
+			if (!b->insert_ship(j, PLACE) && msg->msg_type != MSG_DEBUG_SHIP_PLACEMENT) {
 				error = true;
 				break;
 			}
 		}
+	}
+
+	if (b->remaining_ships() < SHIPS_COUNT && msg->msg_type != MSG_DEBUG_SHIP_PLACEMENT) {
+		error = true;
 	}
 
 	if (error) {
@@ -418,7 +418,7 @@ void Server::handle_player_get_board(struct client_t *c, msg_parsing *msg) {
 
 	Ship **ships = p->get_board()->get_ships();
 	int **matrix = p->get_board()->get_board();
-	bool blue = true;
+	bool blue = false;
 	int k;
 
 	for (int i = 0; i < BOARD_SIZE; i++) {
@@ -457,6 +457,8 @@ void Server::handle_player_get_board(struct client_t *c, msg_parsing *msg) {
 			blue = !blue;
 		}
 	}
+
+	send_message(c->client_socket, &c_msg);
 }
 
 void Server::handle_player_get_board_lost(struct client_t *c, msg_parsing *msg) {
@@ -467,27 +469,27 @@ void Server::handle_player_get_board_lost(struct client_t *c, msg_parsing *msg) 
 
 	msg_creation c_msg;
 
-	if (c->p->is_dead()) {
-		Player *p = m->get_player_by_id(msg->data.player_get_board.id);
+	if (c->p->is_dead() || msg->msg_type == MSG_DEBUG_GET_BOARD) {
+		Player *p = m->get_player_by_id(msg->data.player_get_board_lost.id);
 		if (p == NULL) {
 			send_unknown_player(c);
 			return;
 		}
 
 		c_msg.msg_type = ACK_MSG_GET_BOARD_LOST;
-		c_msg.data.ack_get_board.client.player_id = c->p->get_id();
-		c_msg.data.ack_get_board.player.player_id = p->get_id();
+		c_msg.data.ack_get_board_lost.client.player_id = c->p->get_id();
+		c_msg.data.ack_get_board_lost.player.player_id = p->get_id();
 
 		Ship **ships = p->get_board()->get_ships();
 		int **matrix = p->get_board()->get_board();
-		bool blue = true;
+		bool blue = false;
 		int k;
 
 		for (int i = 0; i < BOARD_SIZE; i++) {
 			for (int j = 0; j < BOARD_SIZE; j++) {
 				if (matrix[i][j] > 0) {
 					if (matrix[i][j] == DAMAGE) {
-						c_msg.data.ack_get_board.board.matrix[i][j] = COLOR_NOT_HIT;
+						c_msg.data.ack_get_board_lost.board.matrix[i][j] = COLOR_NOT_HIT;
 					} else if (matrix[i][j] > DAMAGE) {
 						for (k = 0; k < SHIPS_COUNT; k++) {
 							if (ships[k]->point_intersect(j, i)) {
@@ -495,18 +497,18 @@ void Server::handle_player_get_board_lost(struct client_t *c, msg_parsing *msg) 
 							}
 						}
 						if (ships[k]->is_sunk()) {
-							c_msg.data.ack_get_board.board.matrix[i][j] = COLOR_SUNK;
+							c_msg.data.ack_get_board_lost.board.matrix[i][j] = COLOR_SUNK;
 						} else {
-							c_msg.data.ack_get_board.board.matrix[i][j] = COLOR_HIT;
+							c_msg.data.ack_get_board_lost.board.matrix[i][j] = COLOR_HIT;
 						}
 					} else {
-						c_msg.data.ack_get_board.board.matrix[i][j] = COLOR_SHIP;
+						c_msg.data.ack_get_board_lost.board.matrix[i][j] = COLOR_SHIP;
 					}
 				} else {
 					if (blue) {
-						c_msg.data.ack_get_board.board.matrix[i][j] = COLOR_BLUE_TILE;
+						c_msg.data.ack_get_board_lost.board.matrix[i][j] = COLOR_BLUE_TILE;
 					} else {
-						c_msg.data.ack_get_board.board.matrix[i][j] = COLOR_AQUA_TILE;
+						c_msg.data.ack_get_board_lost.board.matrix[i][j] = COLOR_AQUA_TILE;
 					}
 				}
 				blue = !blue;
@@ -515,6 +517,9 @@ void Server::handle_player_get_board_lost(struct client_t *c, msg_parsing *msg) 
 				blue = !blue;
 			}
 		}
+
+		Logger::write("[server] " + p->get_name() + "[" + std::to_string(p->get_id()) + "] board");
+		Logger::write(matrix, BOARD_SIZE, BOARD_SIZE);
 	} else {
 		c_msg.msg_type = ACK_MSG_MATCH_NOT_DEAD;
 		c_msg.data.ack_match_not_dead.player_id = c->p->get_id();
@@ -726,39 +731,41 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 	}
 
 	if (m->all_attacked(c->p)) {
+		m->next_turn();
+
 		msg_creation turn;
 		turn.msg_type = MSG_MATCH_TURN;
-		turn.data.match_turn.turn = false;
-		msg_parsing recv;
-		c->p->set_turn(false);
-		send_message(c->client_socket, &turn);
-		//receive_message(c->client_socket, &recv);
-
-		size_t i;
-		for (i = 0; i < clients->size(); i++) {
-			if ((*clients)[i]->p->get_id() == c->p->get_id()) {
-				if (i == clients->size() - 1) {
-					i = 0;
-				} else {
-					i++;
-				}
-				break;
+		std::vector<Player*> *players = m->get_players();
+		for (auto p : *players) {
+			if (!p->is_ai()) {
+				turn.data.match_turn.turn = p->his_turn();
+				struct client_t *c = get_client(p->get_id());
+				send_message(c->client_socket, &turn);
+				//receive_message((*clients)[i]->client_socket, &recv);
 			}
 		}
-		(*clients)[i]->p->set_turn(true);
-		turn.data.match_turn.turn = true;
-		send_message((*clients)[i]->client_socket, &turn);
-		//receive_message((*clients)[i]->client_socket, &recv);
 	}
 }
 
 void Server::append_info(Player *p, struct stats_t *info) {
 	info->duration = Match::get_duration(m->get_start_time(), p->get_end_time());
-	info->grade = p->get_grade();
 	info->hits = p->get_hits();
 	info->missed = p->get_misses();
+	info->grade = info->hits + info->missed > 0 ? p->get_grade() : D;
 	info->remaining_ships = p->remaining_ships();
 	info->sunk_ships = p->get_sunk_ships();
+}
+
+void Server::append_player_list(struct msg_player_list *list) {
+	std::vector<Player*> *players = m->get_players();
+	for (auto &p : *players) {
+		if (!p->is_dead()) {
+			struct player_info info;
+			info.name = p->get_name();
+			info.player_id = p->get_id();
+			list->array.push_back(info);
+		}
+	}
 }
 
 void Server::handle_player_quit(struct client_t *c) {
@@ -767,6 +774,7 @@ void Server::handle_player_quit(struct client_t *c) {
 		return;
 	}
 
+	c->p->set_end_time();
 	msg_creation msg;
 	msg.msg_type = ACK_MSG_MATCH_END;
 	msg.data.ack_match_end.player.player_id = c->p->get_id();
@@ -784,10 +792,7 @@ void Server::handle_host_init_match(struct client_t *c, msg_parsing *msg) {
 	if (c->p->is_host()) {
 		m->set_difficulty((enum game_difficulty_e)msg->data.host_init_match.difficulty);
 		for (int i = 0; i < msg->data.host_init_match.ais; i++) {
-			Player *p = new Player(false);
-			p->set_ai(true);
-			p->set_diff(m->get_difficulty());
-			p->set_name("ai_" + std::to_string(i+1));
+			Player *p = new Ai(i+1, m->get_difficulty());
 			m->add_player(p);
 		}
 
@@ -799,6 +804,13 @@ void Server::handle_host_init_match(struct client_t *c, msg_parsing *msg) {
 		c_msg.data.ack_match_not_host.player_id = c->p->get_id();
 	}
 	send_message(c->client_socket, &c_msg);
+
+	msg_creation player_list;
+	player_list.msg_type = MSG_PLAYER_LIST;
+	append_player_list(&player_list.data.msg_player_list);
+	for (auto c : *clients) {
+		send_message(c->client_socket, &player_list);
+	}
 }
 
 void Server::handle_host_start_match(struct client_t *c) {

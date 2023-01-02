@@ -3,6 +3,7 @@
 
 #include <condition_variable>
 #include <mutex>
+#include <vector>
 
 #include <msg.hpp>
 #include <server.hpp>
@@ -13,13 +14,12 @@ struct thread_manager_t {
     std::mutex mtx;
     std::unique_lock<std::mutex> lk{(mtx)};
 
-    enum msg_type_e waiting_message_low;
-    enum msg_type_e waiting_message_high;
+    std::vector<enum msg_type_e> waiting_list;
 };
 
-void reset_waiting_msg(struct thread_manager_t *mng);
+void wait_for(struct thread_manager_t *mng, std::vector<enum msg_type_e> *list);
 void wait_for(struct thread_manager_t *mng, enum msg_type_e type);
-void wait_for(struct thread_manager_t *mng, enum msg_type_e low, enum msg_type_e high);
+bool is_waited(struct thread_manager_t *mng, enum msg_type_e type);
 
 void lock(struct thread_manager_t *mng);
 void unlock(struct thread_manager_t *mng);

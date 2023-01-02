@@ -79,6 +79,7 @@ class Server {
 		void send_unknown_player(struct client_t *c);
 
 		void append_info(Player *p, struct stats_t *info);
+		void append_player_list(struct msg_player_list *list);
 
 		void print_players();
 

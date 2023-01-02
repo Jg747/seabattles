@@ -29,6 +29,7 @@ class Client {
 
         void reset_player_list();
         void handle_match_started();
+        void handle_match_turn(msg_parsing *msg);
         void stop_receiver();
         void create_receiver();
         bool wait_socket();

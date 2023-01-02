@@ -44,3 +44,29 @@ void Logger::stop() {
         Logger::log_file.close();
     }
 }
+
+void Logger::write(int **matrix, int rows, int cols) {
+    std::string x = "";
+    for (int i = 0; i < rows; i++) {
+        x += "[ ";
+        for (int j = 0; j < cols; j++) {
+            x += std::to_string(matrix[i][j]) + "\t";
+        }
+        x.pop_back();
+        x += " ]\n";
+    }
+    Logger::write(x);
+}
+
+void Logger::write(int matrix[][10], int rows, int cols) { // RIMUOVERE
+    std::string x = "";
+    for (int i = 0; i < rows; i++) {
+        x += "[ ";
+        for (int j = 0; j < cols; j++) {
+            x += std::to_string(matrix[i][j]) + "\t";
+        }
+        x.pop_back();
+        x += " ]\n";
+    }
+    Logger::write(x);
+}

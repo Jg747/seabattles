@@ -87,8 +87,6 @@ class Player {
 
 		bool is_ai();
 		void set_ai(bool state);
-		void ai_attack(Player *p);
-		void reset_ai_atk(Player *p);
 
 		bool is_host();
 

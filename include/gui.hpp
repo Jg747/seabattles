@@ -58,6 +58,8 @@ class Gui {
 		void conn_err(msg_parsing *msg);
 		void got_kicked(msg_parsing *msg);
 		void end_game_win(msg_parsing *msg);
+
+		void stop_game(bool state);
 	
 	private:
 		WINDOW *game_wrapper[2];
@@ -74,10 +76,12 @@ class Gui {
 		Client *client;
 		Player *dummy;
 		std::map<int, Player*> p_list;
+		bool stop;
 
 		struct thread_manager_t *mng;
 
 		void debug_window();
+		void reset_start_menu();
 
 		void del_array_win(WINDOW *array[], int len);
 		void init_gui();
@@ -91,6 +95,7 @@ class Gui {
 		int menu_cursor(WINDOW *w, int x, int y, int noptions, string symbol, bool step_last);
 
 		bool init_singleplayer_game(enum game_difficulty_e diff, int num_ai);
+		void wait_turn_packet();
 
 		int game_menu();
 		int diff_menu();

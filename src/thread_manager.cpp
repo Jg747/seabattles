@@ -5,21 +5,24 @@
 #include <client.hpp>
 #include <server.hpp>
 
-void reset_waiting_msg(struct thread_manager_t *mng) {
-    mng->waiting_message_high = UNKNOWN;
-    mng->waiting_message_low = UNKNOWN;
+void wait_for(struct thread_manager_t *mng, std::vector<enum msg_type_e> *list) {
+    mng->waiting_list = *list;
+    lock(mng);
 }
 
 void wait_for(struct thread_manager_t *mng, enum msg_type_e type) {
-    mng->waiting_message_low = type;
-    mng->waiting_message_high = type;
+    mng->waiting_list.clear();
+    mng->waiting_list.push_back(type);
     lock(mng);
 }
 
-void wait_for(struct thread_manager_t *mng, enum msg_type_e low, enum msg_type_e high) {
-    mng->waiting_message_low = low;
-    mng->waiting_message_high = high;
-    lock(mng);
+bool is_waited(struct thread_manager_t *mng, enum msg_type_e type) {
+    for (const auto t : mng->waiting_list) {
+        if (t == type) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void lock(struct thread_manager_t *mng) {
@@ -28,7 +31,7 @@ void lock(struct thread_manager_t *mng) {
 
 void unlock(struct thread_manager_t *mng) {
     mng->locker.notify_one();
-    reset_waiting_msg(mng);
+    mng->waiting_list.clear();
 }
 
 // Server thread, non toccare con quelle tue luride manine

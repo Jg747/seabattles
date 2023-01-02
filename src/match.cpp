@@ -79,12 +79,6 @@ bool Match::remove_player(int id) {
 
 void Match::start_match() {
 	status = RUNNING;
-
-	int rand_x;
-	int rand_y;
-	int rand_r;
-	Board *b;
-	Ship **ships;
 	
 	for (auto p : *players) {
 		for (auto enemy : *players) {
@@ -92,32 +86,12 @@ void Match::start_match() {
 				p->add_player_to_attack(enemy);
 			}
 		}
-
-		if (p->is_ai()) {
-			b = p->get_board();
-			ships = b->get_ships();
-			for (int i = 0; i < SHIPS_COUNT; ) {
-				rand_x = (rand() % 10001) / 1000;
-				rand_y = (rand() % 10001) / 1000;
-				rand_r = (rand() % 4001) / 1000;
-				if (Ship::evaluate_pos(rand_x, rand_y, ships[i]->get_len(), (enum rotation_e)rand_r)) {
-					ships[i]->set_x(rand_x);
-					ships[i]->set_y(rand_y);
-					ships[i]->set_rotation((enum rotation_e)rand_r);
-					ships[i]->set_placed(true);
-					if (b->insert_on_board(ships[i])) {
-						i++;
-					}
-				}
-			}
-			p->set_placed_ships(true);
-		}
 	}
 
 	Match::set_time(start_time);
-	(*players)[0]->set_turn(true);
+	players->at(0)->set_turn(true);
 	for (size_t i = 1; i < players->size(); i++) {
-		(*players)[i]->set_turn(false);
+		players->at(i)->set_turn(false);
 	}
 }
 
@@ -172,4 +146,18 @@ bool Match::is_winner(Player *p) {
 
 bool Match::eliminated(Player *p) {
 	return p->get_board()->remaining_ships() == 0;
+}
+
+void Match::next_turn() {
+	for (size_t i = 0; i < players->size(); i++) {
+		if (players->at(i)->his_turn()) {
+			players->at(i)->set_turn(false);
+			if (i + 1 == players->size()) {
+				players->at(0)->set_turn(true);
+			} else {
+				players->at(i + 1)->set_turn(true);
+			}
+			break;
+		}
+	}
 }

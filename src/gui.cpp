@@ -78,7 +78,6 @@ void Gui::init_gui() {
 	box(game_wrapper[1], ACS_VLINE, ACS_HLINE);
 
 	start_menu[1] = newwin(LINES-3, COLS-2, 2, 1);
-	box(start_menu[1], ACS_VLINE, ACS_HLINE);
 
 	//Title
 	game_wrapper[0] = newwin(LINES-2, COLS-2, 1, 1);
@@ -107,9 +106,8 @@ void Gui::init_gui() {
 	refresh();
 	wrefresh(game_wrapper[1]);
 	wrefresh(game_wrapper[0]);
-	wrefresh(start_menu[1]);
-	wrefresh(start_menu[0]);
 
+	reset_start_menu();
 	debug_window();
 
 	Logger::write("[gui] Created GUI");
@@ -597,7 +595,11 @@ bool Gui::send_board() {
 	msg_creation msg;
 	msg_parsing recv;
 
-	msg.msg_type = MSG_PLAYER_SHIP_PLACEMENT;
+	if (Logger::debug) {
+		msg.msg_type = MSG_DEBUG_SHIP_PLACEMENT;
+	} else {
+		msg.msg_type = MSG_PLAYER_SHIP_PLACEMENT;
+	}
 	Ship **ship_array = dummy->get_board()->get_ships();
 	struct ship_t *ship;
 	for (int i = 0; i < SHIPS_COUNT; i++) {
@@ -609,7 +611,10 @@ bool Gui::send_board() {
 	}
 
 	client->send_message(&msg);
-	wait_for(mng, ACK);
+	std::vector<enum msg_type_e> list;
+	list.push_back(ACK);
+	list.push_back(ACK_INVALID_SHIP_PLACEMENT);
+	wait_for(mng, &list);
 	recv = client->get_msg(ACK);
 
 	if (recv.msg_type == ACK) {
@@ -624,8 +629,8 @@ void Gui::send_forfeit(msg_parsing *msg) {
 
 	c_msg.msg_type = MSG_PLAYER_QUIT;
 	client->send_message(&c_msg);
-	wait_for(mng, MSG_MATCH_END);
-	r_msg = client->get_msg(MSG_MATCH_END);
+	wait_for(mng, ACK_MSG_MATCH_END);
+	r_msg = client->get_msg(ACK_MSG_MATCH_END);
 
 	if (msg != NULL) {
 		*msg = r_msg;
@@ -642,7 +647,7 @@ bool Gui::place_ships() {
 	while (!confirm) {
 		choice = actions_menu(PLACE_SHIPS);
 		if (choice == 5) {
-			if (dummy->get_board()->remaining_ships() < SHIPS_COUNT) {
+			if (dummy->get_board()->remaining_ships() < SHIPS_COUNT && !Logger::debug) {
 				mvwrite_on_window(actions[0], width/2 - 12 < 0 ? 0 : width/2 - 12, height/2 + 7, "[Must place all ships!]");
 				wrefresh(actions[0]);
 				sleep(2);
@@ -682,6 +687,9 @@ void Gui::paint_enemy_sea(Player *defender) {
 
 	int height, width;
 	get_win_size(sea[0][0], width, height);
+
+	Logger::write(defender->get_name() + " board");
+	Logger::write(matrix, BOARD_SIZE, BOARD_SIZE);
 
 	for (int i = 0; i < BOARD_SIZE; i++) {
 		for (int j = 0; j < BOARD_SIZE; j++) {
@@ -725,7 +733,10 @@ bool Gui::attack_at(Player *defender, int x, int y) {
 	c_msg.data.player_attack.y = y;
 
 	client->send_message(&c_msg);
-	wait_for(mng, ACK_MSG_MATCH_ATTACK_STATUS);
+	std::vector<enum msg_type_e> list;
+	list.push_back(ACK_MSG_MATCH_ATTACK_STATUS);
+	list.push_back(ACK_MSG_MATCH_ATTACK_ERR);
+	wait_for(mng, &list);
 	p_msg = client->get_msg(ACK_MSG_MATCH_ATTACK_STATUS);
 	
 	if (p_msg.msg_type != ACK_MSG_MATCH_ATTACK_STATUS) {
@@ -742,22 +753,35 @@ void Gui::ask_board(Player *p, bool lost) {
 	msg_creation c_msg;
 	msg_parsing r_msg;
 
-	if (lost) {
+	if (Logger::debug) {
+		c_msg.msg_type = MSG_DEBUG_GET_BOARD;
+		c_msg.data.player_get_board_lost.id = p->get_id();
+	} else if (lost) {
 		c_msg.msg_type = MSG_PLAYER_GET_BOARD_LOST;
+		c_msg.data.player_get_board_lost.id = p->get_id();
 	} else {
 		c_msg.msg_type = MSG_PLAYER_GET_BOARD;
+		c_msg.data.player_get_board.id = p->get_id();
 	}
-	c_msg.data.player_get_board.id = p->get_id();
 
 	client->send_message(&c_msg);
-	wait_for(mng, ACK_MSG_GET_BOARD);
+	std::vector<enum msg_type_e> list;
+	list.push_back(ACK_MSG_GET_BOARD);
+	list.push_back(ACK_MSG_GET_BOARD_LOST);
+	wait_for(mng, &list);
+	struct board_t *new_matrix;
 	r_msg = client->get_msg(ACK_MSG_GET_BOARD);
+	new_matrix = &r_msg.data.ack_get_board.board;
+	if (r_msg.msg_type == UNKNOWN) {
+		r_msg = client->get_msg(ACK_MSG_GET_BOARD_LOST);
+		new_matrix = &r_msg.data.ack_get_board_lost.board;
+	}
 
 	int **matrix;
 	matrix = p->get_board()->get_board();
 	for (int i = 0; i < BOARD_SIZE; i++) {
 		for (int j = 0; j < BOARD_SIZE; j++) {
-			matrix[i][j] = r_msg.data.ack_get_board.board.matrix[i][j];
+			matrix[i][j] = new_matrix->matrix[i][j];
 		}
 	}
 }
@@ -832,11 +856,12 @@ bool Gui::attack(Player *defender) {
 void Gui::make_actions() {
 	int choice;
 	if (dummy->his_turn()) {
+		Logger::write("[gui] turn make_actions");
 		choice = actions_menu(GAME);
 		switch (choice) {
 			case 0:
 				if (this->mode == SINGLEPLAYER) {
-					Player *defender = p_list[1];
+					Player *defender = p_list[2];
 					if (!attack(defender)) {
 						Logger::write("[gui] Aborted attacking" + defender->get_name());
 					}
@@ -846,7 +871,7 @@ void Gui::make_actions() {
 				break;
 			case 1:
 				if (this->mode == SINGLEPLAYER) {
-					Player *defender = p_list[1];
+					Player *defender = p_list[2];
 					actions_menu(SEE_FIELD);
 					view_field(defender);
 					getch();
@@ -859,15 +884,17 @@ void Gui::make_actions() {
 					msg_parsing r_msg;
 					send_forfeit(&r_msg);
 					end_game_win(&r_msg);
+					stop = true;
 				}
 				break;
 		}
 	} else {
+		Logger::write("[gui] not turn make_actions");
 		choice = actions_menu(GAME_WAITING_TURN);
 		switch (choice) {
 			case 0:
 				if (this->mode == SINGLEPLAYER) {
-					Player *defender = p_list[1];
+					Player *defender = p_list[2];
 					actions_menu(SEE_FIELD);
 					view_field(defender);
 					getch();
@@ -880,6 +907,7 @@ void Gui::make_actions() {
 					msg_parsing r_msg;
 					send_forfeit(&r_msg);
 					end_game_win(&r_msg);
+					stop = true;
 				}
 				break;
 		}
@@ -898,7 +926,15 @@ void Gui::make_actions_spectator() {
 	}
 }
 
+void Gui::reset_start_menu() {
+	box(start_menu[1], ACS_VLINE, ACS_HLINE);
+	wrefresh(start_menu[1]);
+	wrefresh(start_menu[0]);
+}
+
 int Gui::pregame() {
+	reset_start_menu();
+
 	int value = game_menu();
     if (value == 2) {
         return 0;
@@ -964,7 +1000,10 @@ bool Gui::init_singleplayer_game(enum game_difficulty_e diff, int num_ai) {
 	msg.data.host_init_match.difficulty = diff;
 	msg.data.host_init_match.ais = num_ai;
 	client->send_message(&msg);
-	wait_for(mng, ACK_MSG_MATCH_INIT_MATCH);
+	std::vector<enum msg_type_e> list;
+	list.push_back(ACK_MSG_MATCH_INIT_MATCH);
+	list.push_back(ACK_MSG_MATCH_NOT_HOST);
+	wait_for(mng, &list);
 	recv = client->get_msg(ACK_MSG_MATCH_INIT_MATCH);
 	if (recv.msg_type != ACK_MSG_MATCH_INIT_MATCH || recv.data.ack_match_init_match.status != GS_OK) {
 		return false;
@@ -972,7 +1011,10 @@ bool Gui::init_singleplayer_game(enum game_difficulty_e diff, int num_ai) {
 
 	msg.msg_type = MSG_HOST_START_MATCH;
 	client->send_message(&msg);
-	wait_for(mng, ACK);
+	list.clear();
+	list.push_back(ACK);
+	list.push_back(ACK_MSG_MATCH_NOT_HOST);
+	wait_for(mng, &list);
 	recv = client->get_msg(ACK);
 	if (recv.msg_type != ACK) {
 		return false;
@@ -1012,10 +1054,16 @@ void Gui::turn(bool turn) {
 	dummy->set_turn(turn);
 	int x, y;
 	if (turn) {
+		Logger::write("[gui] turn started");
 		paint_actions_menu(GAME, x, y);
 	} else {
+		Logger::write("[gui] turn end");
 		paint_actions_menu(GAME_WAITING_TURN, x, y);
 	}
+}
+
+void Gui::stop_game(bool state) {
+	this->stop = state;
 }
 
 void Gui::set_new_board(msg_parsing *msg) {
@@ -1159,8 +1207,29 @@ void Gui::set_player_list(std::map<int, Player*> player_list) {
 	this->p_list = player_list;
 }
 
+void Gui::wait_turn_packet() {
+	wait_for(mng, MSG_MATCH_TURN);
+	msg_parsing msg = client->get_msg(MSG_MATCH_TURN);
+	
+	turn(msg.data.match_turn.turn);
+    
+	msg_creation c_msg;
+    c_msg.msg_type = ACK;
+    client->send_message(&c_msg);
+}
+
 void Gui::start_game() {
-	place_ships();
+	if (!place_ships()) {
+		return;
+	}
+
+	wait_turn_packet();
+
+	stop = false;
+	while (!stop) {
+		paint_placement_sea();
+		make_actions();
+	}
 }
 
 /************************************************/

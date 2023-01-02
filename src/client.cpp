@@ -30,7 +30,6 @@ Client::Client(struct thread_manager_t *mng) {
     stop = false;
     client_socket = -1;
     this->mng = mng;
-    reset_waiting_msg(mng);
 }
 
 Client::~Client() {
@@ -70,6 +69,7 @@ void Client::stop_server() {
 }
 
 bool Client::start() {
+    Player::set_id_start(0);
     int temp = g->pregame();
     
     if (temp == 0) {
@@ -97,8 +97,8 @@ bool Client::do_from_socket() {
 
         for (size_t i = 0; i < this->msgs.size(); i++) {
             msg_parsing r_msg = msgs[i];
-            // Messaggi che sono in attesa di essere ricevuti
-            if (r_msg.msg_type >= mng->waiting_message_low && r_msg.msg_type <= mng->waiting_message_high) {
+            // Messaggi che sono in attesa di essere ricevuti nell'altro thread
+            if (is_waited(mng, r_msg.msg_type)) {
                 unlock(mng);
             } else {
                 // Messaggi asincroni del server
@@ -114,7 +114,7 @@ bool Client::do_from_socket() {
                         i--;
                         break;
                     case MSG_MATCH_TURN:
-                        g->turn(r_msg.data.match_turn.turn);
+                        handle_match_turn(&r_msg);
                         msgs.erase(msgs.begin() + i);
                         i--;
                         break;
@@ -133,6 +133,7 @@ bool Client::do_from_socket() {
                     
                     case MSG_MATCH_WIN:
                     case MSG_MATCH_END:
+                        g->stop_game(true);
                         g->end_game_win(&r_msg);
                         stop = true;
                         msgs.erase(msgs.begin() + i);
@@ -140,6 +141,7 @@ bool Client::do_from_socket() {
                         break;
 
                     case MSG_MATCH_GOT_KICKED:
+                        g->stop_game(true);
                         g->got_kicked(&r_msg);
                         stop = true;
                         msgs.erase(msgs.begin() + i);
@@ -217,7 +219,12 @@ bool Client::connect_to_server(std::string ip, int port) {
 
     create_receiver();
 
-    wait_for(mng, MSG_CONN_ACCEPTED, MSG_CONN_SERVER_FULL);
+    std::vector<enum msg_type_e> list;
+    list.push_back(MSG_CONN_ACCEPTED);
+    list.push_back(MSG_CONN_ERR);
+    list.push_back(MSG_CONN_MATCH_STARTED);
+    list.push_back(MSG_CONN_SERVER_FULL);
+    wait_for(mng, &list);
 
     msg_parsing msg;
     msg = get_msg(MSG_CONN_ACCEPTED);
@@ -339,6 +346,14 @@ void Client::handle_match_started() {
     send_message(&msg);
     
     g->game_starting();
+}
+
+void Client::handle_match_turn(msg_parsing *msg) {
+    g->turn(msg->data.match_turn.turn);
+
+    msg_creation c_msg;
+    c_msg.msg_type = ACK;
+    send_message(&c_msg);
 }
 
 bool Client::is_stop() {
