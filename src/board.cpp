@@ -117,7 +117,7 @@ bool Board::insert_on_board(Ship *&ship) {
 				ship->set_placed(false);
 				return false;
 			}
-			for (int i = ship->get_x(); i > ship->get_y() - ship->get_len(); i--, counter++) {
+			for (int i = ship->get_y(); i > ship->get_y() - ship->get_len(); i--, counter++) {
 				board[i][ship->get_x()] = ship->get_id() + counter;
 			}
 			break;

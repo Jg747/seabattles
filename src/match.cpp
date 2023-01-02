@@ -101,8 +101,10 @@ std::vector<Player*> *Match::get_players() {
 
 bool Match::all_attacked(Player *p) {
 	for (auto def : *players) {
-		if (!p->get_attack(def)->attacked) {
-			return false;
+		if (p != def) {
+			if (!p->get_attack(def)->attacked) {
+				return false;
+			}
 		}
 	}
 	return true;
@@ -148,16 +150,27 @@ bool Match::eliminated(Player *p) {
 	return p->get_board()->remaining_ships() == 0;
 }
 
-void Match::next_turn() {
+Player* Match::next_turn() {
 	for (size_t i = 0; i < players->size(); i++) {
 		if (players->at(i)->his_turn()) {
 			players->at(i)->set_turn(false);
-			if (i + 1 == players->size()) {
-				players->at(0)->set_turn(true);
+			Player *p;
+			i++;
+			if (i == players->size()) {
+				p = players->at(0);
+				i = 0;
 			} else {
-				players->at(i + 1)->set_turn(true);
+				p = players->at(i);
 			}
+			p->set_turn(true);
+			for (size_t j = 0; j < players->size(); j++) {
+				if (j != i) {
+					p->get_attack(players->at(j))->attacked = false;
+				}
+			}
+			return p;
 			break;
 		}
 	}
+	return NULL;
 }

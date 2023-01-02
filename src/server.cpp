@@ -534,10 +534,14 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 		return;
 	}
 
-	struct client_t *defender = get_client(msg->data.player_attack.player.player_id);
-	if (defender == NULL) {
-		send_unknown_player(c);
-		return;
+	Player *p = m->get_player_by_id(msg->data.player_attack.player.player_id);
+	struct client_t *defender;
+	if (!p->is_ai()) {
+		defender = get_client(p->get_id());
+		if (defender == NULL) {
+			send_unknown_player(c);
+			return;
+		}
 	}
 
 	if (!c->p->his_turn()) {
@@ -570,7 +574,7 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 		return;
 	}
 
-	struct attacked_player *atk = c->p->get_attack(defender->p);
+	struct attacked_player *atk = c->p->get_attack(p);
 	if (atk->attacked) {
 		msg_creation c_msg;
 		c_msg.msg_type = ACK_MSG_MATCH_ATTACK_ERR;
@@ -580,7 +584,7 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 		return;
 	}
 
-	int **matrix = defender->p->get_board()->get_board();
+	int **matrix = p->get_board()->get_board();
 	if (matrix[msg->data.player_attack.y][msg->data.player_attack.x] >= DAMAGE) {
 		msg_creation c_msg;
 		c_msg.msg_type = ACK_MSG_MATCH_ATTACK_STATUS;
@@ -603,7 +607,7 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 		matrix[msg->data.player_attack.y][msg->data.player_attack.x] += DAMAGE;
 
 		int k;
-		Ship **ships = defender->p->get_board()->get_ships();
+		Ship **ships = p->get_board()->get_ships();
 		for (k = 0; k < SHIPS_COUNT; k++) {
 			if (ships[k]->point_intersect(msg->data.player_attack.x, msg->data.player_attack.y)) {
 				break;
@@ -613,7 +617,7 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 		if (ships[k]->is_sunk()) {
 			c_msg.data.ack_match_attack_status.status = HIT_SUNK;
 			c->p->inc_sunk_ships();
-			defender->p->dec_remaining_ships();
+			p->dec_remaining_ships();
 		} else {
 			c_msg.data.ack_match_attack_status.status = HIT;
 			c->p->inc_hits();
@@ -621,68 +625,71 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 	}
 	send_message(c->client_socket, &c_msg);
 
-	msg_parsing recv;
-	msg_creation new_board;
-	new_board.msg_type = MSG_MATCH_NEW_BOARD;
-	new_board.data.match_new_board.player.player_id = defender->p->get_id();
-	new_board.data.match_new_board.attacker.name = c->p->get_name();
+	if (!p->is_ai()) {
+		msg_creation new_board;
+		new_board.msg_type = MSG_MATCH_NEW_BOARD;
+		new_board.data.match_new_board.player.player_id = p->get_id();
+		new_board.data.match_new_board.attacker.name = c->p->get_name();
 
-	Ship **ships = defender->p->get_board()->get_ships();
-	matrix = defender->p->get_board()->get_board();
-	bool blue = true;
-	int k;
+		Ship **ships = p->get_board()->get_ships();
+		matrix = p->get_board()->get_board();
+		bool blue = true;
+		int k;
 
-	for (int i = 0; i < BOARD_SIZE; i++) {
-		for (int j = 0; j < BOARD_SIZE; j++) {
-			if (matrix[i][j] > 0) {
-				if (matrix[i][j] == DAMAGE) {
-					new_board.data.match_new_board.board.matrix[i][j] = COLOR_NOT_HIT;
-				} else if (matrix[i][j] > DAMAGE) {
-					for (k = 0; k < SHIPS_COUNT; k++) {
-						if (ships[k]->point_intersect(j, i)) {
-							break;
+		for (int i = 0; i < BOARD_SIZE; i++) {
+			for (int j = 0; j < BOARD_SIZE; j++) {
+				if (matrix[i][j] > 0) {
+					if (matrix[i][j] == DAMAGE) {
+						new_board.data.match_new_board.board.matrix[i][j] = COLOR_NOT_HIT;
+					} else if (matrix[i][j] > DAMAGE) {
+						for (k = 0; k < SHIPS_COUNT; k++) {
+							if (ships[k]->point_intersect(j, i)) {
+								break;
+							}
+						}
+						if (ships[k]->is_sunk()) {
+							new_board.data.match_new_board.board.matrix[i][j] = COLOR_SUNK;
+						} else {
+							new_board.data.match_new_board.board.matrix[i][j] = COLOR_HIT;
+						}
+					} else {
+						if (blue) {
+							new_board.data.match_new_board.board.matrix[i][j] = COLOR_BLUE_TILE;
+						} else {
+							new_board.data.match_new_board.board.matrix[i][j] = COLOR_AQUA_TILE;
 						}
 					}
-					if (ships[k]->is_sunk()) {
-						new_board.data.match_new_board.board.matrix[i][j] = COLOR_SUNK;
-					} else {
-						new_board.data.match_new_board.board.matrix[i][j] = COLOR_HIT;
-					}
 				} else {
-					if (blue) {
-						new_board.data.match_new_board.board.matrix[i][j] = COLOR_BLUE_TILE;
-					} else {
-						new_board.data.match_new_board.board.matrix[i][j] = COLOR_AQUA_TILE;
-					}
+					new_board.data.match_new_board.board.matrix[i][j] = COLOR_SHIP;
 				}
-			} else {
-				new_board.data.match_new_board.board.matrix[i][j] = COLOR_SHIP;
+				blue = !blue;
 			}
-			blue = !blue;
+			if (BOARD_SIZE % 2 == 0) {
+				blue = !blue;
+			}
 		}
-		if (BOARD_SIZE % 2 == 0) {
-			blue = !blue;
-		}
+
+		send_message(defender->client_socket, &new_board);
+		//receive_message(defender->client_socket, &recv);
 	}
 
-	send_message(defender->client_socket, &new_board);
-	//receive_message(defender->client_socket, &recv);
+	if (m->eliminated(p)) {
+		Logger::write("[server] eliminated: " + p->get_name());
+		p->set_loser(true);
 
-	if (m->eliminated(defender->p)) {
-		defender->p->set_loser(true);
-
-		msg_creation lose;
-		msg_parsing recv;
+		if (!p->is_ai()) {
+			msg_creation lose;
 		
-		lose.msg_type = MSG_MATCH_LOSE;
-		lose.data.match_lose.player.player_id = defender->p->get_id();
-		append_info(defender->p, &lose.data.match_lose.info);
-		send_message(defender->client_socket, &lose);
-		//receive_message(defender->client_socket, &recv);
+			lose.msg_type = MSG_MATCH_LOSE;
+			lose.data.match_lose.player.player_id = p->get_id();
+			append_info(p, &lose.data.match_lose.info);
+			send_message(defender->client_socket, &lose);
+			//receive_message(defender->client_socket, &recv);
+		}
 
 		msg_creation p_removed;
 		p_removed.msg_type = MSG_MATCH_PLAYER_REMOVED;
-		p_removed.data.match_player_removed.player.name = defender->p->get_name();
+		p_removed.data.match_player_removed.player.name = p->get_name();
 		p_removed.data.match_player_removed.reason = "LOST";
 
 		std::vector<Player*> *players = m->get_players();
@@ -702,6 +709,7 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 	}
 
 	if (m->is_winner(c->p)) {
+		Logger::write("[server] winner: " + c->p->get_name());
 		c->p->set_winner(true);
 
 		msg_creation win;
@@ -731,20 +739,47 @@ void Server::handle_player_attack(struct client_t *c, msg_parsing *msg) {
 	}
 
 	if (m->all_attacked(c->p)) {
-		m->next_turn();
+		Logger::write("[server] " + c->p->get_name() + "[" + std::to_string(c->p->get_id()) + "] finished attacking");
+		send_turn();
+		while (next_turn());
+	}
+}
 
-		msg_creation turn;
-		turn.msg_type = MSG_MATCH_TURN;
-		std::vector<Player*> *players = m->get_players();
-		for (auto p : *players) {
-			if (!p->is_ai()) {
-				turn.data.match_turn.turn = p->his_turn();
-				struct client_t *c = get_client(p->get_id());
-				send_message(c->client_socket, &turn);
-				//receive_message((*clients)[i]->client_socket, &recv);
-			}
+void Server::send_turn() {
+	std::vector<Player*> *players = m->get_players();
+
+	msg_creation turn;
+	turn.msg_type = MSG_MATCH_TURN;
+	for (auto p : *players) {
+		if (!p->is_ai()) {
+			turn.data.match_turn.turn = p->his_turn();
+			struct client_t *c = get_client(p->get_id());
+			send_message(c->client_socket, &turn);
+			//receive_message((*clients)[i]->client_socket, &recv);
 		}
 	}
+}
+
+bool Server::next_turn() {
+	Player *p = m->next_turn();
+	if (p == NULL) {
+		send_turn();
+		return false;
+	}
+	Logger::write("[server] now " + p->get_name() + "[" + std::to_string(p->get_id()) + "] turn");
+
+	if (p->is_ai()) {
+		std::vector<Player*> *players = m->get_players();
+		for (auto defender : *players) {
+			if (defender->get_id() != p->get_id()) {
+				//((Ai*)p)->ai_attack(defender);
+			}
+		}
+		return true;
+	}
+	
+	send_turn();
+	return false;
 }
 
 void Server::append_info(Player *p, struct stats_t *info) {

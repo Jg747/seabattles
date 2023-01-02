@@ -60,6 +60,7 @@ class Server {
 		void reset_fd_set();
 
 		void create_match();
+		bool next_turn();
 
 		void send_message(int client_socket, msg_creation *msg);
         void receive_message(struct client_t *c);
@@ -77,6 +78,7 @@ class Server {
 
 		void send_server_error(struct client_t *c);
 		void send_unknown_player(struct client_t *c);
+		void send_turn();
 
 		void append_info(Player *p, struct stats_t *info);
 		void append_player_list(struct msg_player_list *list);

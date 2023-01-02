@@ -28,7 +28,7 @@ class Match {
 		bool add_player(Player *p);
 		bool remove_player(Player *p);
 		bool remove_player(int id);
-		void next_turn();
+		Player* next_turn();
 
 		std::vector<Player*> *get_players();
 		Player *get_player_by_id(int id);

@@ -9,9 +9,7 @@ Cose da sistemare alla fine:
 */
 
 #include <iostream>
-#include <mutex>
 #include <chrono>
-#include <csignal>
 
 #include <debug.hpp>
 #include <player.hpp>
@@ -21,7 +19,7 @@ Cose da sistemare alla fine:
 Client *c;
 
 int main(int argc, char *argv[]) {
-	Logger::debug = true;
+	Logger::debug = false;
 	
 	time_t seed = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	srand(time(&seed));

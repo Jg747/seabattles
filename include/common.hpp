@@ -7,7 +7,7 @@
 #define SERVER_IP "127.0.0.1"
 
 #define MAX_CLIENTS 8
-#define RECV_BUF_LEN (1000+1)
+#define RECV_BUF_LEN (1000 + 1)
 
 #define DEFAULT_PLAYER_NAME "player"
 
@@ -16,7 +16,7 @@
 #define SHIPS_COUNT 5
 #define SHOTS_TO_WIN 5 + 4 + 3 + 3 + 2
 
-#define DAMAGE 0xFFFFFF
+#define DAMAGE 0xFFFF
 
 extern const int ships_len[];
 

@@ -51,10 +51,11 @@ void Gui::del_array_win(WINDOW* array[], int len) {
 void Gui::debug_window() {
 	if (Logger::debug) {
 		box(debug_win[1], ACS_VLINE, ACS_HLINE);
-		wrefresh(debug_win[1]);
+		wnoutrefresh(debug_win[1]);
 		wclear(debug_win[0]);
 		wprintw(debug_win[0], "%s", Logger::get_last_lines().c_str());
-		wrefresh(debug_win[0]);
+		wnoutrefresh(debug_win[0]);
+		doupdate();
 	}
 }
 
@@ -71,6 +72,7 @@ void Gui::init_gui() {
 	init_pair((short)COLOR_SELECT_HIT, COLOR_MAGENTA, COLOR_MAGENTA);
 
 	curs_set(0);
+	cbreak();
 	noecho();
 
 	//Borders
@@ -103,9 +105,8 @@ void Gui::init_gui() {
 	//Execution
 	start_menu[0] = newwin(LINES-5, COLS-4, 3, 2);
 
-	refresh();
-	wrefresh(game_wrapper[1]);
-	wrefresh(game_wrapper[0]);
+	wnoutrefresh(game_wrapper[1]);
+	wnoutrefresh(game_wrapper[0]);
 
 	reset_start_menu();
 	debug_window();
@@ -122,8 +123,8 @@ void Gui::init_game_windows() {
 
 	sea_border[0] = newwin(line - 2, col - 1, 3, 2);
 
-	wrefresh(sea_border[1]);
-	wrefresh(sea_border[0]);
+	wnoutrefresh(sea_border[1]);
+	wnoutrefresh(sea_border[0]);
 
 	// SEA
 	init_sea();
@@ -135,8 +136,9 @@ void Gui::init_game_windows() {
 	get_win_size(actions[1], max_cols, max_lines);
 	actions[0] = newwin(max_lines - 2, max_cols - 2, 3, 3 + col);
 
-	wrefresh(actions[1]);
-	wrefresh(actions[0]);
+	wnoutrefresh(actions[1]);
+	wnoutrefresh(actions[0]);
+	doupdate();
 
 	debug_window();
 }
@@ -279,7 +281,7 @@ void Gui::write_fleet_type(string who) {
 		w -= width/4;
 	}
 	mvwrite_on_window(sea_border[0], w, 0, string(who + " fleet"));
-	wrefresh(sea_border[0]);
+	wnoutrefresh(sea_border[0]);
 }
 
 void Gui::paint_placement_sea() {
@@ -332,10 +334,11 @@ void Gui::paint_placement_sea() {
 
 	for (int i = 0; i < BOARD_SIZE + 1; i++) {
 		for (int j = 0; j < BOARD_SIZE + 1; j++) {
-			wrefresh(sea[i][j]);
+			wnoutrefresh(sea[i][j]);
 		}
 	}
 	write_fleet_type("Your");
+	doupdate();
 
 	debug_window();
 }
@@ -449,8 +452,9 @@ void Gui::paint_actions_menu(enum action_e a, int &width, int &height) {
 			break;
 	}
 
-	wrefresh(actions[1]);
-	wrefresh(actions[0]);
+	wnoutrefresh(actions[1]);
+	wnoutrefresh(actions[0]);
+	doupdate();
 	debug_window();
 }
 
@@ -533,6 +537,7 @@ void Gui::paint_ship(int index) {
 			}
 			break;
 	}
+	doupdate();
 }
 
 int Gui::place_a_ship(int index) {
@@ -550,29 +555,34 @@ int Gui::place_a_ship(int index) {
 
 	int ch = 0;
 	while (ch != '\n') {
-		keypad(actions[0], TRUE);
+		keypad(actions[0], true);
 		ch = wgetch(actions[0]);
-		keypad(actions[0], FALSE);
+		keypad(actions[0], false);
 		switch (ch) {
 			case KEY_UP:
 				b->insert_ship(index, MOVE_UP);
 				paint_ship(index);
+				debug_window();
 				break;
 			case KEY_RIGHT:
 				b->insert_ship(index, MOVE_RIGHT);
 				paint_ship(index);
+				debug_window();
 				break;
 			case KEY_DOWN:
 				b->insert_ship(index, MOVE_DOWN);
 				paint_ship(index);
+				debug_window();
 				break;
 			case KEY_LEFT:
 				b->insert_ship(index, MOVE_LEFT);
 				paint_ship(index);
+				debug_window();
 				break;
 			case 'r':
 				b->insert_ship(index, ROTATE);
 				paint_ship(index);
+				debug_window();
 				break;
 			case 'c':
 				paint_placement_sea();
@@ -688,9 +698,6 @@ void Gui::paint_enemy_sea(Player *defender) {
 	int height, width;
 	get_win_size(sea[0][0], width, height);
 
-	Logger::write(defender->get_name() + " board");
-	Logger::write(matrix, BOARD_SIZE, BOARD_SIZE);
-
 	for (int i = 0; i < BOARD_SIZE; i++) {
 		for (int j = 0; j < BOARD_SIZE; j++) {
 			if (height > 1) {
@@ -710,8 +717,10 @@ void Gui::view_field(Player *defender) {
 }
 
 void Gui::paint_attack(int **board, int y, int x) {
-	if (board[y][x] == COLOR_NOT_HIT || board[y][x] == COLOR_HIT || board[y][x] == COLOR_SUNK) {
+	if (board[y][x] == COLOR_HIT || board[y][x] == COLOR_SUNK) {
 		color_tile(y, x, COLOR_ALREADY_HIT);
+	} else if (board[y][x] == COLOR_NOT_HIT) {
+		color_tile(y, x, COLOR_HIT);
 	} else {
 		color_tile(y, x, COLOR_SELECT_HIT);
 	}
@@ -720,7 +729,7 @@ void Gui::paint_attack(int **board, int y, int x) {
 bool Gui::attack_at(Player *defender, int x, int y) {
 	int **matrix;
 	matrix = defender->get_board()->get_board();
-	if (matrix[y][x] != COLOR_AQUA_TILE && matrix[y][x] != COLOR_BLUE_TILE) {
+	if (matrix[y][x] == COLOR_NOT_HIT || matrix[y][x] == COLOR_HIT || matrix[y][x] == COLOR_SUNK) {
 		return false;
 	}
 
@@ -784,24 +793,27 @@ void Gui::ask_board(Player *p, bool lost) {
 			matrix[i][j] = new_matrix->matrix[i][j];
 		}
 	}
+
+	Logger::write("[client] " + p->get_name() + "[" + std::to_string(p->get_id()) + "] board");
+	Logger::write(matrix, BOARD_SIZE, BOARD_SIZE);
 }
 
 bool Gui::attack(Player *defender) {
 	int x = 0;
 	int y = 0;
+	int **board = defender->get_board()->get_board();
 
 	actions_menu(ATTACK);
 	ask_board(defender, false);
 	paint_enemy_sea(defender);
-	paint_attack(defender->get_board()->get_board(), y, x);
-
-	int **board = defender->get_board()->get_board();
+	paint_attack(board, y, x);
 
 	retry:
 	int ch = 0;
-	keypad(actions[0], true);
 	while (ch != '\n') {
+		keypad(actions[0], true);
 		ch = wgetch(actions[0]);
+		keypad(actions[0], false);
 		switch (ch) {
 			case 'w':
 			case KEY_UP:
@@ -836,12 +848,10 @@ bool Gui::attack(Player *defender) {
 				}
 				break;
 			case 'q':
-				keypad(actions[0], false);
 				return false;
 				break;
 		}
 	}
-	keypad(actions[0], false);
 
 	Logger::write("[gui] Trying attacking " + defender->get_name() + " [" + std::to_string(y) + ", " + std::to_string(x) + "]");
 	if (!attack_at(defender, x, y)) {
@@ -863,7 +873,7 @@ void Gui::make_actions() {
 				if (this->mode == SINGLEPLAYER) {
 					Player *defender = p_list[2];
 					if (!attack(defender)) {
-						Logger::write("[gui] Aborted attacking" + defender->get_name());
+						Logger::write("[gui] Aborted attacking " + defender->get_name());
 					}
 				} else if (this->mode == MULTIPLAYER) {
 					// player selection -> attack del player
@@ -874,7 +884,7 @@ void Gui::make_actions() {
 					Player *defender = p_list[2];
 					actions_menu(SEE_FIELD);
 					view_field(defender);
-					getch();
+					wgetch(actions[0]);
 				} else if (this->mode == MULTIPLAYER) {
 					// player selection -> see_field del player
 				}
@@ -897,7 +907,7 @@ void Gui::make_actions() {
 					Player *defender = p_list[2];
 					actions_menu(SEE_FIELD);
 					view_field(defender);
-					getch();
+					wgetch(actions[0]);
 				} else if (this->mode == MULTIPLAYER) {
 					// player selection -> see_field del player
 				}
@@ -928,8 +938,9 @@ void Gui::make_actions_spectator() {
 
 void Gui::reset_start_menu() {
 	box(start_menu[1], ACS_VLINE, ACS_HLINE);
-	wrefresh(start_menu[1]);
-	wrefresh(start_menu[0]);
+	wnoutrefresh(start_menu[1]);
+	wnoutrefresh(start_menu[0]);
+	doupdate();
 }
 
 int Gui::pregame() {
@@ -954,7 +965,10 @@ int Gui::pregame() {
 		usleep(500000);
 		
 		if (!client->connect_to_server(SERVER_IP, SERVER_PORT)) {
-			delete dummy;
+			if (dummy != NULL) {
+				delete dummy;
+			}
+			dummy = NULL;
 			Logger::write("[client][ERROR] " + client->get_error());
 			client->stop_server();
 			conn_err(NULL);
@@ -962,7 +976,10 @@ int Gui::pregame() {
 		}
 
 		if (!init_singleplayer_game((enum game_difficulty_e)value, 1)) {
-			delete dummy;
+			if (dummy != NULL) {
+				delete dummy;
+			}
+			dummy = NULL;
 			Logger::write("[client][ERROR] " + client->get_error());
 			client->stop_server();
 			return 2;
@@ -972,9 +989,10 @@ int Gui::pregame() {
 		this->mode = MULTIPLAYER;
         // ...
     }
+	usleep(50000);
 	game_starting();
 
-	usleep(500000);
+	usleep(50000);
 	init_game_windows();
 
 	return 1;
@@ -1031,8 +1049,9 @@ void Gui::game_starting() {
 	std::string temp = "Starting match.......";
 	mvwrite_on_window(start_menu[0], width/2 - temp.length()/2, height/2, temp);
 
-	wrefresh(start_menu[1]);
-	wrefresh(start_menu[0]);
+	wnoutrefresh(start_menu[1]);
+	wnoutrefresh(start_menu[0]);
+	doupdate();
 	debug_window();
 	usleep(1000000);
 }
@@ -1045,8 +1064,9 @@ void Gui::creating_server_win() {
 	std::string temp = "Creating server......";
 	mvwrite_on_window(start_menu[0], width/2 - temp.length()/2, height/2, temp);
 
-	wrefresh(start_menu[1]);
-	wrefresh(start_menu[0]);
+	wnoutrefresh(start_menu[1]);
+	wnoutrefresh(start_menu[0]);
+	doupdate();
 	debug_window();
 }
 
@@ -1138,10 +1158,11 @@ void Gui::end_game_win(msg_parsing *msg) {
 	
 	mvwrite_on_window(start_menu[0], width/2 - 13, height/2 + 5, "[press any key to continue]");
 	
-	wrefresh(start_menu[1]);
-	wrefresh(start_menu[0]);
+	wnoutrefresh(start_menu[1]);
+	wnoutrefresh(start_menu[0]);
+	doupdate();
 	debug_window();
-	getch();
+	wgetch(start_menu[0]);
 }
 
 void Gui::conn_err(msg_parsing *msg) {
@@ -1175,10 +1196,11 @@ void Gui::conn_err(msg_parsing *msg) {
 
 	mvwrite_on_window(start_menu[0], width/2 - 13, height/2 + 5, "[press any key to continue]");
 	
-	wrefresh(start_menu[1]);
-	wrefresh(start_menu[0]);
+	wnoutrefresh(start_menu[1]);
+	wnoutrefresh(start_menu[0]);
+	doupdate();
 	debug_window();
-	getch();
+	wgetch(start_menu[0]);
 }
 
 void Gui::got_kicked(msg_parsing *msg) {
@@ -1193,10 +1215,11 @@ void Gui::got_kicked(msg_parsing *msg) {
 
 	mvwrite_on_window(start_menu[0], width/2 - 13, height/2 + 5, "[press any key to continue]");
 	
-	wrefresh(start_menu[1]);
-	wrefresh(start_menu[0]);
+	wnoutrefresh(start_menu[1]);
+	wnoutrefresh(start_menu[0]);
+	doupdate();
 	debug_window();
-	getch();
+	wgetch(start_menu[0]);
 }
 
 std::map<int, Player*> *Gui::get_player_list() {
