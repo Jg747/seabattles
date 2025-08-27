@@ -2,10 +2,14 @@
 #define __client_h__
 
 #include <thread>
+#include <condition_variable>
+#include <mutex>
+#include <vector>
 
 #include <server.hpp>
 #include <msg.hpp>
 #include <gui.hpp>
+#include <thread_manager.hpp>
 
 class Gui;
 
@@ -13,22 +17,29 @@ class Client {
     private:
         int client_socket;
         bool stop;
-        fd_set fd_list;
         std::string error;
-        msg_parsing r_msg;
+        std::vector<msg_parsing> msgs;
 
         Gui *g;
         Server *s;
         std::thread *t_server;
+        std::thread *receiver;
 
-        void reset_fd_set();
-        bool do_from_socket();
+        struct thread_manager_t *mng;
 
         void reset_player_list();
+        void handle_match_started();
+        void handle_match_turn(msg_parsing *msg);
+        void stop_receiver();
+        void create_receiver();
+        bool wait_socket();
 
     public:
-        Client();
+        Client(struct thread_manager_t *mng);
         ~Client();
+
+        bool is_stop();
+        bool do_from_socket();
 
         void create_server();
         void stop_server();
@@ -37,7 +48,9 @@ class Client {
         bool start();
         bool connect_to_server(std::string ip, int port);
         void send_message(msg_creation *msg);
-        void receive_message(msg_parsing *msg);
+        void receive_message();
+
+        msg_parsing get_msg(enum msg_type_e type);
 };
 
 #endif

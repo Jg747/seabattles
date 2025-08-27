@@ -39,6 +39,7 @@ class Player {
 		inline static int id;
 	
 	public:
+		Player();
 		Player(bool is_host);
 		~Player();
 
@@ -86,8 +87,6 @@ class Player {
 
 		bool is_ai();
 		void set_ai(bool state);
-		void ai_attack(Player *p);
-		void reset_ai_atk(Player *p);
 
 		bool is_host();
 
