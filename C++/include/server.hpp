@@ -22,6 +22,7 @@
 
 struct client_t {
 	Player *p;
+	std::vector<msg_parsing> msgs;
 	int client_socket;
 };
 
@@ -53,14 +54,17 @@ class Server {
 		bool add_new_client();
 		struct client_t *get_client(int id);
 		void remove_client(int client_socket);
+		msg_parsing get_msg(struct client_t *c, enum msg_type_e type);
 
 		bool handle_client_request(struct client_t *c);
 		void reset_fd_set();
 
 		void create_match();
+		bool next_turn();
 
 		void send_message(int client_socket, msg_creation *msg);
-        void receive_message(int client_socket, msg_parsing *msg);
+        void receive_message(struct client_t *c);
+		void receive_message(int client_socket, msg_parsing *msg);
 
 		void handle_player_get_own_id(struct client_t *c, msg_parsing *msg);
 		void handle_player_ship_placement(struct client_t *c, msg_parsing *msg);
@@ -74,8 +78,12 @@ class Server {
 
 		void send_server_error(struct client_t *c);
 		void send_unknown_player(struct client_t *c);
+		void send_turn();
 
 		void append_info(Player *p, struct stats_t *info);
+		void append_player_list(struct msg_player_list *list);
+
+		void print_players();
 
 	public:	
 		struct server_error error;
@@ -85,7 +93,6 @@ class Server {
 
 		bool start();
 		void stop();
-		void reset();
 
 		bool is_running();
 		std::string get_ip();

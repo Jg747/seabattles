@@ -21,6 +21,8 @@ class Logger {
         
         static std::string get_last_lines();
         static void write(std::string str);
+        static void write(int **matrix, int rows, int cols);
+        static void write(int matrix[][10], int rows, int cols);//rimuovere
         static void stop();
 
     private:

@@ -7,7 +7,7 @@
 #include <common.hpp>
 
 extern const char *MSG_TYPE_STR[];
-#define MSG_TYPE_STR_LEN 35
+#define MSG_TYPE_STR_LEN 37
 
 extern const char *ATTACK_STATUS_STR[];
 #define ATTACK_STATUS_STR_LEN 8
@@ -30,6 +30,10 @@ enum msg_type_e {
 	MSG_PLAYER_GET_BOARD_LOST,
 	MSG_PLAYER_ATTACK,
 	MSG_PLAYER_QUIT,
+
+	// Messaggi dei client [debug]
+	MSG_DEBUG_SHIP_PLACEMENT,
+	MSG_DEBUG_GET_BOARD,
 
 	// Messaggi dell'HOST
 	MSG_HOST_INIT_MATCH,

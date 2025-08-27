@@ -4,7 +4,7 @@
 #include <ship.hpp>
 #include <common.hpp>
 
-const int ships_len[] = {5, 4, 3, 3, 2};
+const int ships_len[] = { 5, 4, 3, 3, 2 };
 
 using std::string;
 using std::to_string;
@@ -279,7 +279,7 @@ string Ship::type_to_string() {
 string Ship::get_info() {
 	string str = "Ship (id: " + to_string(this->get_id()) + ")\n";
 	str += "type: " + this->type_to_string() + "\n";
-	str += "len: " + to_string(this->get_len() + '0') + "\n";
+	str += "len: " + to_string(this->get_len()) + "\n";
 	str += "rotation: " + this->pos_to_string() + "\n";
 	str += "pos: " + to_string(this->get_x()) + ", " + to_string(this->get_y()) + "\n";
 	str += "placed: " + string((this->is_placed() ? "true" : "false")) + "\n";

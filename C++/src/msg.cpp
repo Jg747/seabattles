@@ -30,6 +30,10 @@ const char *MSG_TYPE_STR[] = {
 	"MSG_PLAYER_ATTACK",
 	"MSG_PLAYER_QUIT",
 
+	// Messaggi dei client [debug]
+	"MSG_DEBUG_SHIP_PLACEMENT",
+	"MSG_DEBUG_GET_BOARD",
+
 	// Host
 	"MSG_HOST_INIT_MATCH",
 	"MSG_HOST_START_MATCH",
@@ -115,7 +119,12 @@ static pugi::xml_document init_msg(enum msg_type_e type) {
 	pugi::xml_document doc;
 	pugi::xml_node msg = doc.append_child("message");
 	pugi::xml_node msg_type = msg.append_child("type");
-	msg_type.append_child(pugi::node_pcdata).set_value(type == ACK || (type >= 14 && type <= 22) || (type >= 2 && type <= 5) ? "ack" : MSG_TYPE_STR[type]);
+	msg_type.append_child(pugi::node_pcdata).set_value(
+		type == ACK || 
+		(type >= ACK_MSG_PLAYER_GET_OWN_ID && type <= ACK_MSG_SERVER_UNKNOWN_ID) || 
+		(type >= MSG_CONN_ACCEPTED && type <= MSG_CONN_MATCH_STARTED) 
+		? "ack" : MSG_TYPE_STR[type]
+	);
 	return doc;
 }
 
@@ -413,7 +422,7 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 		msg->msg_type = type;
 	}
 	pugi::xml_document doc = init_msg(type);
-	
+
 	switch (type) {
 		case ACK:
 			create_ack(doc, msg);
@@ -435,12 +444,14 @@ std::string create_message(enum msg_type_e type, msg_creation *msg) {
 		case MSG_PLAYER_GET_OWN_ID:
 			create_player_get_own_id(doc, msg);
 			break;
+		case MSG_DEBUG_SHIP_PLACEMENT:
 		case MSG_PLAYER_SHIP_PLACEMENT:
 			create_player_ship_placement(doc, msg);
 			break;
 		case MSG_PLAYER_GET_BOARD:
 			create_player_get_board(doc, msg);
 			break;
+		case MSG_DEBUG_GET_BOARD:
 		case MSG_PLAYER_GET_BOARD_LOST:
 			create_player_get_board_lost(doc, msg);
 			break;
@@ -755,12 +766,14 @@ void parse_message(std::string &xml_message, msg_parsing *msg) {
 		case MSG_PLAYER_GET_OWN_ID:
 			parse_player_get_own_id(doc, msg);
 			break;
+		case MSG_DEBUG_SHIP_PLACEMENT:
 		case MSG_PLAYER_SHIP_PLACEMENT:
 			parse_player_ship_placement(doc, msg);
 			break;
 		case MSG_PLAYER_GET_BOARD:
 			parse_player_get_board(doc, msg);
 			break;
+		case MSG_DEBUG_GET_BOARD:
 		case MSG_PLAYER_GET_BOARD_LOST:
 			parse_player_get_board_lost(doc, msg);
 			break;
