@@ -1,16 +1,20 @@
 package org.seabattles.gui.jfx;
 
+import java.io.IOException;
+
+import org.seabattles.src.Game;
+
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
-import java.io.IOException;
-
 public class FxGUI extends Application {
 
     private static Scene scene;
+    
+    private static Game game;
 
     @Override
     public void start(Stage stage) throws IOException {

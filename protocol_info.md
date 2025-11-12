@@ -1,719 +1,521 @@
 # PROTOCOL INFO
-- Si crea il server, crea un match vuoto
-- Connessione del client - man mano che i player si aggiungono scelgo i turni - il primo a connettersi è sempre l'host | `ACK [MSG_CONN_ACCEPTED | MSG_CONN_ERR | MSG_CONN_SERVER_FULL | MSG_CONN_MATCH_STARTED]`
-- Get id del client `[MSG_PLAYER_GET_OWN_ID (nome del player)]` | `ACK` contenente l'ID del player (assegno il nome del player ricevuto al corrispettivo Player*)
-- Invio lista dei vari giocatori (per la GUI) ogni volta che varia la lista `[MSG_PLAYER_LIST (lista giocatori)]` | `ACK`
-- il client host mi invia lo start match quando gli tira `[MSG_HOST_START_MATCH]` | `ACK` oppure `ACK [MSG_MATCH_NOT_HOST]`
-- Quando il match è startato avviso tutti i giocatori che il match è startato (in locale ci pensa la GUI a far piazzare le navi) `[MSG_MATCH_STARTED]` | `ACK`
-- Tutti i giocatori per cazzi loro in locale inseriscono le navi (una volta terminato l'inserimento si bloccano nel loro field e fine)
-- Quando i giocatori confermano il loro piazzamento inviano le coordinate e la direzione delle loro navi in un messaggio `[MSG_PLAYER_SHIP_PLACEMENT (arr[5]=>[type, x, y, orient], ...)]` | `ACK` oppure `ACK [INVALID_SHIP_PLACEMENT]`
-- Una volta che tutti hanno confermato invio a tutti `[MSG_MATCH_TURN (your_turn | true o false in base di chi sia il turno)]` | `ACK`
-- Il player attacca, prima c'è un `[MSG_PLAYER_GET_BOARD]`, poi un `[MSG_PLAYER_ATTACK (chi, x, y)]` | `ACK [MSG_MATCH_ATTACK_STATUS(attacco fallito, preso niente, colpito, affondato)]` oppure `ACK [MSG_MATCH_ATTACK_ERR(not turn, can't attack same player, dead_cant_attack)]`
-   Invio al difensore `[MSG_MATCH_NEW_BOARD]` | `ACK`
-- I vari player possono cercare di voler vedere i vari field nel mentre che attendono quindi scelta del giocatore da 
-  vedere `[MSG_PLAYER_GET_BOARD (chi)]` | `ACK (dati [ogni cella nel messaggio conterrà solo l'ID del colore da mettere])`
-- In caso un giocatore vinca invio `[MSG_MATCH_WIN (stats)]` | `ACK`
-	invio a tutti `[MSG_MATCH_END (stats)]` | `ACK`
--  In caso un giocatore perda `[MSG_MATCH_LOSE (stats)]` | `ACK` - rimane li a vedere i vari field, si vedono sia le navi che dove l'altro è stato attaccato
-- quando ha perso un giocatore e deve vedere un field invia `[MSG_PLAYER_GET_BOARD_LOST (chi)]` | `ACK (dati [ogni cella nel messaggio conterrà solo l'ID del colore da mettere])` oppure `ACK [MSG_MATCH_NOT_DEAD]`
-- quando un giocatore viene rimosso dal GAME (non dal server) invio a tutti i giocatori `[MSG_MATCH_PLAYER_REMOVED (chi - motivazione - lista giocatori)]`
-- In caso un giocatore quitti invia `[MSG_PLAYER_QUIT]` | `ACK [MSG_MATCH_END (stats)]`
-- In caso un host voglia kickare qualcuno (menu / in game) invia `[MSG_HOST_PLAYER_KICK (chi - motivazione)]` | `ACK` oppure `ACK [MSG_MATCH_NOT_HOST]`
-	- invio al kickato `[MSG_MATCH_GOT_KICKED (motivazione)]`
-	- invio a tutti i giocatori `[MSG_MATCH_PLAYER_REMOVED (chi - motivazione - lista giocatori)]`
+1. Si crea un match vuoto, questo crea il server
+2. Connessione del client - man mano che i player si aggiungono scelgo i turni - il primo a connettersi è sempre l'host
+3. Il client manda il proprio nome utente
+4. Il server manda la configurazione del game (navi e board) al client + invia a tutti i clients le sprites delle navi
+5. Il server manda la lista dei players ogni volta che si aggiorna la lista dei giocatori
+6. L'host puo' kickare/bannare un client
+7. L'host manda lo start del match al server + il server manda lo start del match ai clients
+8. Ogni client manda la propria configurazione delle navi (ogni nave in ordine dal config: x, y, rot) e il server controlla la correttezza
+9. Quando tutti i client sono ok allora il server manda il messaggio di start del game
+10. Il server manda il messaggio del turno true al client con il turno e tutti gli altri il turno false
+11. Per attaccare il client CON IL TURNO manda una richiesta della board del player che sta visualizzando e dopo un messaggio di attacco alle coordinate scelte, il server risponde confermando l'attacco oppure dando un errore (non ha il turno, coord invalide, i morti non attaccano)
+12. Il server a seguito dell'attacco manda un messaggio al client attaccato con l'aggiornamento della board e chi lo ha attaccato
+13. Ogni client puo' richiedere la board del client scelto
+14. A match finito il Server manda ad ogni client le stats di tutti i clients ordinate per nome e il vincitore
+15. Un client puo' essere eliminato
+16. Un client può uscire dal gioco, prima di farlo inviera' un avviso al server che lo invierà a tutti i clients
+17. Chat message
+18. Il client puo' chiedere il proprio ID al server
+19. Il server puo' inviare errori e messaggi di controllo
 
-# FORMAT
-## INVIO
-```
-<message>
-	<type>msg_type</type>
-	<data>
-		<data_name>value</data_name>
-		<data_name>
-			<element>data</element>
-			<element>data</element>
-			<element>data</element>
-		</data_name>
-		<data_name>
-			<row>
-				<element>data</element>
-				<element>data</element>
-				<element>data</element>
-			</row>
-			<row>
-				<element>data</element>
-				<element>data</element>
-				<element>data</element>
-			</row>
-			<row>
-				<element>data</element>
-				<element>data</element>
-				<element>data</element>
-			</row>
-		</data_name>
-	</data>
-</message>
-```
-## RISPOSTA
-```
-<message>
-	<type>ack</type>
-	<data>
-		<acktype>{ack type}</acktype>
-		... {data} ...
-	</data>
-</message>
-
-<message>
-	<type>nak</type>
-</message>
+## 2 Connessione al server
+### Risposta (Server)
+Connessione avvenuta con successo
+```json
+{
+	"type": "conn_success"
+}
 ```
 
-# MESSAGGI
-## CONNESSIONE
-### MSG_CONN_ACCEPTED
-Caso in cui avvenga una connessione senza errori
-Format:
+Server pieno 
+```json
+{
+	"type": "conn_full"
+}
 ```
-<message>
-	<type>ack</type>
-	<data>
-		<acktype>MSG_CONN_ACCEPTED</acktype>
-	</data>
-</message>
-```
-Risposta: `ACK`
-### MSG_CONN_ERR
-Caso in cui avvenga un errore di connessione
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<acktype>MSG_CONN_ERR</acktype>
-	</data>
-</message>
-```
-### MSG_CONN_SERVER_FULL
-Caso in cui il server abbia già più di `8 clients` connessi in pre-match
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<acktype>MSG_CONN_SERVER_FULL</acktype>
-	</data>
-</message>
-```
-Risposta: `ACK`
-### MSG_CONN_MATCH_STARTED
-Caso in cui un giocatore provi a connettersi al server dopo che il match è iniziato
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<acktype>MSG_CONN_MATCH_STARTED</acktype>
-	</data>
-</message>
-```
-Risposta: `ACK`
 
-## MESSAGGI INVIATI DAI CLIENT
-### MESSAGGI NORMALI
-#### MSG_PLAYER_GET_OWN_ID
-Inviato dal client dopo che si è connesso al server, contiene anche lo username, così che gli altri clients potranno ricevere la player list contenente lo username del giocatore (da usare nella GUI)
-Format:
+Match in corso
+```json
+{
+	"type": "conn_match_started"
+}
 ```
-<message>
-	<type>MSG_PLAYER_GET_OWN_ID</type>
-	<data>
-		<username>{player_username}</username>
-	</data>
-</message>
-```
-Risposta: `ACK[MSG_MATCH_PLAYER_ID]`
-#### MSG_PLAYER_SHIP_PLACEMENT
-Inviato dal client una volta confermato il piazzamento delle navi
-Format:
-```
-<message>
-	<type>MSG_PLAYER_SHIP_PLACEMENT</type>
-	<data>
-		<ship>
-			<type>{int type}</type>
-			<x>{x}</x>
-			<y>{y}</y>
-			<orientation>{int orientation}</orientation>
-		</ship>
-	</data>
-</message>
-```
-`type` corrisponde a `enum ship_e`
-`x` corrisponde alla X sul piano
-`y` corrisponde alla Y sul piano
-`orientation` corrisponde a `enum rotation_e`
-Risposta:
-- `ACK` in caso di accettazione
-- `ACK[INVALID_SHIP_PLACEMENT]` in caso uno o più posizionamenti sono non corretti
-#### MSG_PLAYER_ATTACK
-Inviato dal player che ha il turno per indicare che ha attaccato delle specifiche coordinate di un player
-Format:
-```
-<message>
-	<type>MSG_PLAYER_ATTACK</type>
-	<data>
-		<id>{id}</id>
-		<x>{x}</x>
-		<y>{y}</y>
-	</data>
-</message>
-```
-`id` è l'id del difensore
-`x` è la X in cui si è attaccato
-`y` è la Y in cui si è attaccato
-Risposta:
-- `ACK[MSG_MATCH_ATTACK_STATUS]` in caso l'attacco sia o non sia andato a buon fine
-- `ACK[MSG_MATCH_ATTACK_ERR]` in caso ci sia un errore nell'attacco
-#### MSG_PLAYER_GET_BOARD
-Inviato dal player che ha il turno quando ha bisogno di vedere il campo avversario
-Format:
-```
-<message>
-	<type>MSG_PLAYER_GET_BOARD</type>
-	<data>
-		<id>{id}</id>
-	</data>
-</message>
-```
-`id` è l'id del player da vedere
-Risposta: `ACK[MSG_GET_BOARD]`
-#### MSG_PLAYER_GET_BOARD_LOST
-Inviato da uno spettatore per vedere il campo di un giocatore (navi e colpi visibili)
-Format:
-```
-<message>
-	<type>MSG_PLAYER_GET_BOARD_LOST</type>
-	<data>
-		<id>{id}</id>
-	</data>
-</message>
-```
-`id` è l'id del player da vedere
-Risposta: `ACK[MSG_GET_BOARD_LOST]`
-#### MSG_PLAYER_QUIT
-Inviato da un client quando intende uscire dal server
-- Se il player è in game allora il server invierà un `MSG_MATCH_PLAYER_REMOVED` ai clients
-- Se il player è uno spettatore non succede nulla
-Format:
-```
-<message>
-	<type>MSG_PLAYER_QUIT</type>
-</message>
-```
-Risposta: `ACK[MSG_MATCH_END]`
-### MESSAGGI HOST
-#### MSG_HOST_INIT_MATCH
-Inviato dal player host per creare un match
-Format:
-```
-<message>
-	<type>MSG_HOST_INIT_MATCH</type>
-	<data>
-		<difficulty>{difficulty}</difficulty>
-		<ai>{number of ai}</ai>
-	</data>
-</message>
-```
-`difficulty` è la difficoltà del match
-`ai` è il numero di AI presente nel match
-Risposta:
-- `ACK[MSG_MATCH_INIT_MATCH]` in caso sia ok
-- `ACK[MSG_MATCH_NOT_HOST]` in caso il client non sia host
-#### MSG_HOST_START_MATCH
-Inviato dal player host per avviare la partita
-Format:
-```
-<message>
-	<type>MSG_HOST_START_MATCH</type>
-</message>
-```
-Risposta:
-- `ACK` in caso il client sia effettivamente l'host
-- `ACK[MSG_MATCH_NOT_HOST]` in caso il client non sia host
-#### MSG_HOST_PLAYER_KICK
-Inviato dal player host per kickare dal server un player
-Format:
-```
-<message>
-	<type>MSG_HOST_PLAYER_KICK</type>
-	<data>
-		<id>{id}</id>
-		<msg>{message}</msg>
-	</data>
-</message>
-```
-`id` corrisponde all'id del giocatore da kickare
-`msg` corrisponde alla motivazione del kick
-Risposta:
-- `ACK` in caso il client sia effettivamente l'host
-- `ACK[MSG_MATCH_NOT_HOST]` in caso il client non sia host
 
-## RISPOSTE DEL SERVER AL CLIENT
-### ACK
-ACK generico, serve solo di conferma
-Format:
+Connessione fallita
+```json
+{
+	"type": "conn_err",
+	"msg": "{message}"
+}
 ```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>ack</acktype>
-	</data>
-</message>
-```
-`id` è l'id del giocatore
-### ACK[MSG_MATCH_PLAYER_ID]
-Inviato al client dopo aver ricevuto `MSG_PLAYER_GET_OWN_ID`
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<acktype>MSG_MATCH_PLAYER_ID</acktype>
-		<id>{id}</id>
-	</data>
-</message>
-```
-`id` è l'id del giocatore
-### ACK[MSG_MATCH_INIT_MATCH]
-Inviato al client dopo aver ricevuto `MSG_HOST_INIT_MATCH`
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_MATCH_INIT_MATCH</acktype>
-		<status>{status}</status>
-	</data>
-</message>
-```
-`id` è l'id del giocatore
-`status` è lo status della risposta e pul essere:
-- `OK` in caso vada tutto bene
-- `ERROR` in caso i dati forniti non siano validi
-### ACK[MSG_MATCH_NOT_HOST]
-Inviato al client dopo aver tentato un comando da host, ma questo non lo è
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_MATCH_NOT_HOST</acktype>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui è rivolto l'ack (da usare per controllo)
-### ACK[INVALID_SHIP_PLACEMENT]
-Inviato al client dopo aver ricevuto un `MSG_PLAYER_SHIP_PLACEMENT` contenente posizioni invalide
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>INVALID_SHIP_PLACEMENT</acktype>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui è rivolto l'ack (da usare per controllo)
-### ACK[MSG_MATCH_ATTACK_STATUS]
-Inviato al client dopo aver ricevuto un `MSG_PLAYER_ATTACK` valido
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_MATCH_ATTACK_STATUS</acktype>
-		<status>{status}</status>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui è rivolto l'ack (da usare per controllo)
-`status` può essere
-- `FAILED_ATTACK` in caso l'attacco sia effettuato su una posizione già precedentemente colpita
-- `MISSED` in caso non si abbia preso nulla
-- `HIT` in caso si abbia colpito una nave
-- `HIT_SUNK` in caso si abbia colpito e affondato una nave
-### ACK[MSG_MATCH_ATTACK_ERR]
-Inviato al client dopo aver ricevuto un `MSG_PLAYER_ATTACK` non valido
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_MATCH_ATTACK_ERR</acktype>
-		<error>{error}</error>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui è rivolto l'ack (da usare per controllo)
-`error` pul essere
-- `NOT_YOUR_TURN` in caso non sia il proprio turno
-- `NOT_SAME_PLAYER` in caso si abbia già attaccato quel player nello stesso turno
-- `DEAD_CANNOT_ATTACK` in caso uno spettatore tenti di attaccare
-- `INVALID_ATTACK` in caso si forniscano coordinate invalide
-### ACK[MSG_GET_BOARD]
-Inviato al client dopo aver ricevuto un `MSG_PLAYER_GET_BOARD`
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_GET_BOARD</acktype>
-		<player>{id}</player>
-		<board>
-			<row>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				...
-			</row>
-			<row>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				...
-			</row>
-			...
-		</board>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui è rivolto l'ack (da usare per controllo)
-`player` è l'id del player che si sta vedendo
-`color` corrisponde al codice di colore da dare alla GUI del client
-### ACK[MSG_GET_BOARD_LOST]
-Inviato al client dopo aver ricevuto un `MSG_PLAYER_GET_BOARD_LOST`, è uguale a `MSG_PLAYER_GET_BOARD` ma sono in chiaro le posizioni delle navi e dove è stato colpito (è come un `MSG_MATCH_NEW_BOARD` ma rivolto ad uno spettatore)
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_GET_BOARD_LOST</acktype>
-		<player>{id}</player>
-		<board>
-			<row>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				...
-			</row>
-			<row>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				...
-			</row>
-			...
-		</board>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui è rivolto l'ack (da usare per controllo)
-`player` è l'id del player che si sta vedendo
-`color` corrisponde al codice di colore da dare alla GUI del client
-### ACK[MSG_MATCH_NOT_DEAD]
-Inviato al client dopo aver ricevuto un `MSG_PLAYER_GET_BOARD_LOST` anche se il player non è uno spettatore (morto)
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_MATCH_NOT_DEAD</acktype>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui è rivolto l'ack (da usare per controllo)
-### ACK[MSG_MATCH_END]
-Inviato al client dopo aver ricevuto un `MSG_PLAYER_QUIT`
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_MATCH_END</acktype>
-		<duration>{game duration}</duration>
-		<grade>{grade}</grade>
-		<hits>{hits}</hits>
-		<misses>{misses}</misses>
-		<ships>
-			<sunk>{sunk}</sunk>
-			<remaining>{remaining}</remaining>
-		</ships>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui si sta inviando il dato
-`duration` è la lunghezza del game fino a quando non si è usciti
-`grade` è il grado del giocatore alla fine della partita
-`hits` è il numero di di hit effettuate
-`misses` è il numero di miss effettuati
-`sunk` è il numero di navi affondate da lui
-`remaining` è il numero delle proprie navi rimaste
-### ACK[MSG_SERVER_ERROR]
-Inviato in caso ci sia un errore interno al server (e.g. match == NULL)
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_SERVER_ERROR</acktype>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui si sta inviando il dato
-### ACK[MSG_SERVER_UNKNOWN_ID]
-Inviato in caso sia fornito l'ID di un giocatore non riconosciuto
-Format:
-```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>MSG_SERVER_UNKNOWN_ID</acktype>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui si sta inviando il dato
 
-## MESSAGGI INVIATI DAL SERVER
-### MSG_PLAYER_LIST
-Inviato dal server ogni volta che si aggiunge/toglie un giocatore dal match (spettatori esclusi)
-Format:
+## 3 Invio del nome
+### Invio (Client)
+Invio del proprio nome utente
+```json
+{
+	"type": "user_name",
+	"msg": "{player_name}"
+}
 ```
-<message>
-	<type>MSG_PLAYER_LIST</type>
-	<data>
-		<playerlist>
-			<player>
-				<id>{id}</id>
-				<username>{username}</username>
-			</player>
-			<player>
-				<id>{id}</id>
-				<username>{username}</username>
-			</player>
-			...
-		</playerlist>
-	</data>
-</message>
-```
-`id` è l'ID del giocatore, è affiancato a `username` che è l'username fornito
-Risposta: `ACK`
-### MSG_MATCH_STARTED
-Inviato dal server quando è stato ricevuto MSG_HOST_START_MATCH
-Format:
-```
-<message>
-	<type>MSG_MATCH_STARTED</type>
-</message>
-```
-Risposta: `ACK`
-### MSG_MATCH_TURN
-Inviato dal server quando:
-- è iniziato il turno di un giocatore
-- è finito il turno di un giocatore
-Format:
-```
-<message>
-	<type>MSG_MATCH_TURN</type>
-	<data>
-		<turn>{boolean your_turn}</turn>
-	</data>
-</message>
-```
-`turn` è un booleano che sarà true per chi deve iniziare il turno e false per chi deve attendere il proprio turno
-Risposta: `ACK`
-### MSG_MATCH_NEW_BOARD
-Inviato dal server al client quando cambia la situazione nella board di quel player
-Format:
-```
-<message>
-	<type>MSG_MATCH_NEW_BOARD</type>
-	<data>
-		<id>{id}</id>
-		<attacker>{username}</attacker>
-		<board>
-			<row>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				...
-			</row>
-			<row>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				<color>{color}</cololor>
-				...
-			</row>
-			...
-		</board>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui si sta inviando il dato
-`attacker` è lo username del giocatore che ha attaccato il client
-`color` corrisponde al codice di colore da dare alla GUI del client
-Risposta: `ACK`
-### MSG_MATCH_WIN
-Inviato dal server al giocatore che ha vinto quando un match è terminato
-Format:
-```
-<message>
-	<type>MSG_MATCH_WIN</type>
-	<data>
-		<id>{id}</id>
-		<duration>{game duration}</duration>
-		<grade>{grade}</grade>
-		<hits>{hits}</hits>
-		<misses>{misses}</misses>
-		<ships>
-			<sunk>{sunk}</sunk>
-			<remaining>{remaining}</remaining>
-		</ships>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui si sta inviando il dato
-`duration` è la lunghezza del game fino a quando non si è usciti
-`grade` è il grado del giocatore alla fine della partita
-`hits` è il numero di di hit effettuate
-`misses` è il numero di miss effettuati
-`sunk` è il numero di navi affondate da lui
-`remaining` è il numero delle proprie navi rimaste
-Risposta: `ACK`
-### MSG_MATCH_LOSE
-Inviato dal server al giocatore che ha perso (in caso sia l'ultimo giocatore corrisponderà anche ad un MSG_MATCH_END), in alternativa, una volta cambiata schermata, potrà rimanere nel server come spettatore
-Format:
-```
-<message>
-	<type>MSG_MATCH_LOSE</type>
-	<data>
-		<id>{id}</id>
-		<duration>{game duration}</duration>
-		<grade>{grade}</grade>
-		<hits>{hits}</hits>
-		<misses>{misses}</misses>
-		<ships>
-			<sunk>{sunk}</sunk>
-			<remaining>{remaining}</remaining>
-		</ships>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui si sta inviando il dato
-`duration` è la lunghezza del game fino a quando non si è usciti
-`grade` è il grado del giocatore alla fine della partita
-`hits` è il numero di di hit effettuate
-`misses` è il numero di miss effettuati
-`sunk` è il numero di navi affondate da lui
-`remaining` è il numero delle proprie navi rimaste
-Risposta: `ACK`
-### MSG_MATCH_END
-Inviato dal server a tutti gli spettatori del server quando è terminato il match
-Format:
-```
-<message>
-	<type>MSG_MATCH_END</type>
-	<data>
-		<id>{id}</id>
-		<duration>{game duration}</duration>
-		<grade>{grade}</grade>
-		<hits>{hits}</hits>
-		<misses>{misses}</misses>
-		<ships>
-			<sunk>{sunk}</sunk>
-			<remaining>{remaining}</remaining>
-		</ships>
-	</data>
-</message>
-```
-`id` è l'id del giocatore a cui si sta inviando il dato
-`duration` è la lunghezza del game fino a quando non si è usciti
-`grade` è il grado del giocatore alla fine della partita
-`hits` è il numero di di hit effettuate
-`misses` è il numero di miss effettuati
-`sunk` è il numero di navi affondate da lui
-`remaining` è il numero delle proprie navi rimaste
-Risposta: `ACK`
-### MSG_MATCH_PLAYER_REMOVED
-Inviato dal server quando c'è una variazione della player list (player ha perso/è stato kickato) a TUTTI i client connessi
-Format:
-```
-<message>
-	<type>MSG_MATCH_PLAYER_REMOVED</type>
-	<data>
-		<who>{username}</who>
-		<reason>{reason}</reason>
-		<playerlist>
-			<player>
-				<id>{id}</id>
-				<username>{username}</username>
-			</player>
-			<player>
-				<id>{id}</id>
-				<username>{username}</username>
-			</player>
-			...
-		</playerlist>
-	</data>
-</message>
-```
-`who` contiene lo username del player rimosso
-`reason` è la motivazione della rimozione e può essere:
-- `LOST` in caso sia rimosso perché ha perso la partita (tutte le sue navi sono state affondate)
-- `QUIT` in caso un player non spettatore quittasse
-- `Kicked: {message}` in caso sia stato kickato dall'host
-`playerlist` è la nuova player list *senza* il player rimosso `id` è l'ID del giocatore, è affiancato a `username` che è l'username fornito
-Risposta: `ACK`
-### MSG_MATCH_GOT_KICKED
-Inviato dal server al client che è stato kickato (una volta ricevuto quello procederà con la disconnessione "forzata")
-Format:
-```
-<message>
-	<type>MSG_MATCH_GOT_KICKED</type>
-	<data>
-		<reason>{message}</reason>
-	</data>
-</message>
-```
-`reason` corrisponde al messaggio del kick (scritto dall'host quando intende kickare il client)
-Risposta: `ACK`
 
-## GENERICI
-### ACK
-In caso sia una risposta di ricezione corretta del messaggio si invia un `ACK generico`
-Format:
+## 4 Configurazione del game
+### Invio (Client)
+Invio della configurazione della board, delle navi
+```json
+{
+	"type": "config_host",
+	"cfg": {
+		{
+			"gameDifficulty": {difficulty},
+			"playerCount": {numberOfPlayers},
+			"botsCount": {numberOfBots},
+			"board": {
+				"width": {width},
+				"heigth": {heigth}
+			},
+			"ships": [
+				{
+					"id": {id},
+					"length": {length},
+					"width": {width},
+					"sprite": {sprite_name}
+				},
+				// ...
+			]
+		}
+	}
+}
 ```
-<message>
-	<type>ack</type>
-	<data>
-		<id>{id}</id>
-		<acktype>GENERIC</acktype>
-	</data>
-</message>
+### Risposta (Server)
+Il client e' host
+```json
+{
+	"type": "config_host_accept"
+}
 ```
-`id` è l'ID del giocatore a cui è destinato il pacchetto, in caso sia un ACK generico avrà il valore `-1`
-### NAK
-In caso di errore nel parsing verrà inviato il messaggio `NAK`
-Format:
+
+Il client non e' host
+```json
+{
+	"type": "match_not_host"
+}
 ```
-<message>
-	<type>nak</type>
-</message>
+
+### Invio (Server)
+Invio della configurazione a tutti i clients
+```json
+{
+	"type": "config",
+	"cfg": {
+		{
+			"gameDifficulty": {difficulty},
+			"playerCount": {numberOfPlayers},
+			"botsCount": {numberOfBots},
+			"board": {
+				"width": {width},
+				"heigth": {heigth}
+			},
+			"ships": [
+				{
+					"id": {id},
+					"length": {length},
+					"width": {width},
+					"sprite": {sprite_name}
+				},
+				// ...
+			]
+		}
+	}
+}
+```
+
+## 5 Invio lista dei giocatori
+### Invio (Server)
+Invio la lista dei giocatori
+```json
+{
+	"type": "user_list",
+	"list": [
+		{
+			"id": {id},
+			"name": "{name}"
+		},
+		// ...
+	]
+}
+```
+
+## 6 Kick/ban
+### Invio (Client)
+Richiesta di kick
+```json
+{
+	"type": "mod",
+	"subtype": "kick",
+	"id": {id}
+}
+```
+
+Richiesta di ban
+```json
+{
+	"type": "mod",
+	"subtype": "ban",
+	"id": {id}
+}
+```
+
+### Risposta (Server)
+Client e' host
+```json
+{
+	"type": "mod_executed"
+}
+```
+
+Client non e' host
+```json
+{
+	"type": "match_not_host"
+}
+```
+
+### Invio (Server)
+Notifica di espulsione al Client (kick)
+```json
+{
+	"type": "mod",
+	"subtype": "kicked"
+}
+```
+
+Notifica di espulsione al Client (ban)
+```json
+{
+	"type": "mod",
+	"subtype": "banned"
+}
+```
+
+## 7 Invio dello start
+### Invio (Client)
+```json
+{
+	"type": "match_plcm_start"
+}
+```
+
+### Risposta (Server)
+Il client e' host
+```json
+{
+	"type": "match_plcm_started"
+}
+```
+
+Il client non e' host
+```json
+{
+	"type": "match_not_host"
+}
+```
+
+### Invio (Server)
+Invio a tutti i clients connessi
+```json
+{
+	"type": "match_plcm_started"
+}
+```
+
+## 8 Invio della configurazione della propria board
+### Invio (Client)
+Invio della propria board al server
+```json
+{
+	"type": "config_board",
+	"ships": [
+		{
+			"id": {id},
+			"x": {x},
+			"y": {y},
+			"r": {r}
+		},
+		// ...
+	]
+}
+```
+
+### Risposta (Server)
+Configurazione ok
+```json
+{
+	"type": "config_board_ok"
+}
+```
+
+Configurazione non valida
+```json
+{
+	"type": "config_board_err"
+}
+```
+
+## 9 Invio del messaggio dello start del game in se'
+### Invio (Server)
+Game start
+```json
+{
+	"type": "match_start"
+}
+```
+
+## 10 Invio del turno
+### Invio (Server)
+Invio ad ogni client lo status del turno
+```json
+{
+	"type": "turn",
+	"who": {id}
+}
+```
+
+## 11 Attacco
+### Invio (Client)
+Invio della richiesta della board
+```json
+{
+	"type": "board_request",
+	"id": {id},
+	"debug": "null",
+}
+```
+
+### Risposta (Server)
+Invio della board del client richiesto
+```json
+{
+	"type": "board",
+	"board": [
+		// unidimensional array with board values, BOARD_SHIP_FLAG replaced with BOARD_NOTHING
+	]
+}
+```
+
+Il client richiesto non e' disponibile
+```json
+{
+	"type": "board",
+	"board": []
+}
+```
+
+### Invio (Client)
+Invio delle coordinate di attacco
+```json
+{
+	"type": "attack",
+	"id": {id},
+	"x": {x},
+	"y": {y}
+}
+```
+
+### Risposta (Server)
+Il client ha il turno, attacco MISS, HIT, SUNK
+```json
+{
+	"type": "attack_status",
+	"subtype": "ok",
+	"status": "{AttackStatus}"
+}
+```
+
+Il client non ha il turno/ha il turno, INVLID, DEAD, ERROR
+```json
+{
+	"type": "attack_status",
+	"subtype": "error",
+	"status": "{AttackStatus}"
+}
+```
+
+## 12 Aggiornamento board del client attaccato
+### Invio (Server)
+A seguito di un attacco il client attaccato viene notificato con l'aggiornamento della propria board
+```json
+{
+	"type": "got_attacked",
+	"from": {id},
+	"new_board": [
+		// unidimensional array with board values
+	]
+}
+```
+
+## 13 Richiesta della board
+### Invio (Client)
+Il client non ha il cheat/debug attivo
+```json
+{
+	"type": "board_request",
+	"id": {id},
+	"debug": "null"
+}
+```
+
+Il client ha il cheat attivo
+```json
+{
+	"type": "board_request",
+	"id": {id},
+	"debug": "{hardcoded_debug_password}"
+}
+```
+
+### Risposta (Server)
+Il client non ha il cheat/debug attivo
+```json
+{
+	"type": "board",
+	"board": [
+		// unidimensional array with board values, BOARD_SHIP_FLAG replaced with BOARD_NOTHING
+	]
+}
+```
+
+Il client ha il cheat/debug attivo
+```json
+{
+	"type": "board",
+	"board": [
+		// unidimensional array with board values
+	]
+}
+```
+
+Il client richiesto non e' disponibile
+```json
+{
+	"type": "board",
+	"board": []
+}
+```
+
+## 14 Fine match
+### Invio (Server)
+Match terminato
+```json
+{
+	"type": "match_end",
+	"duration": {duration},
+	"players": [
+		{
+			"id": {id},
+			"name": {name},
+			"stats": {
+				"shots": {numberOfShots},
+				"hits": {numberOfHits},
+				"sunk": {numberOfSunkShips},
+				"eliminations": {numberOfPlayerEliminations},
+				"grade": "{grade}"
+			}
+		},
+		// ...
+	]
+}
+```
+
+## 15 Eliminazione
+### Invio (Server)
+Il client e' appena stato eliminato da qualcuno
+Il client non ha il turno
+```json
+{
+	"type": "eliminated",
+	"by": {id}
+}
+```
+
+## 16 Uscita dal match
+### Invio (Client)
+Il client vuole uscire dal server, il server provvedera' a chiudere il Socket
+```json
+{
+	"type": "quit",
+}
+```
+
+### Invio (Server)
+Invio a tutti i client rimasti che un giocatore e' uscito
+```json
+{
+	"type": "left",
+	"id": {id}
+}
+```
+
+## 17 Chat message
+### Invio (Client)
+Invio al server un messaggio dalla chat
+```json
+{
+	"type": "chat_send",
+	"msg": "{text}"
+}
+```
+
+### Invio (Server)
+Invio a tutti i client il messaggio
+Il client richiesto non e' disponibile
+```json
+{
+	"type": "chat_recv",
+	"from": {id},
+	"msg": "{text}"
+}
+```
+
+## 18 Richiesta ID
+### Invio (Client)
+Invio richiesta del proprio ID all'interno del server
+```json
+{
+	"type": "id_request",
+}
+```
+
+### Risposta (Server)
+Risposta contenente l'ID del giocatore all'interno del server (serve per la sincronizzazione)
+```json
+{
+	"type": "id_send",
+	"id": {id}
+}
+```
+
+## 19 Errori e messaggi di controlli
+### Invio (Server)
+Invio di un messaggio di errore generico
+```json
+{
+	"type": "error",
+	"msg": "{basic error explanation}"
+}
+```
+
+### Invio (Server)
+Invio del messaggio per avvisare i client che sta per trasmettere le sprites
+```json
+{
+	"type": "sprites_send",
+	"sprites": [
+		{
+			"id": {ship_id},
+			"name": {fileName}
+		}
+	]
+}
 ```
