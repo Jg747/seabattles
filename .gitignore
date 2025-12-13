@@ -8,5 +8,4 @@ bin
 test*
 .DS_store
 .clang_complete
-seabattle
-seabattles
+*.class

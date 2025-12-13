@@ -5,8 +5,12 @@ import java.io.FileNotFoundException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
+import java.util.Set;
+import java.util.UUID;
 
 import org.seabattles.interfaces.GUI;
 import org.seabattles.src.Board;
@@ -31,15 +35,14 @@ public class AsciiGUI implements GUI {
 		scan = new Scanner(System.in);
 	}
 	
+	@SuppressWarnings("unused")
 	private void placeShip(Board b, int choice) {
 		Ship[] ships = b.getShips();
 		for (Ship s : ships) {
 			if (s.getID() == choice) {
 				boolean done;
-				boolean move = false;
 				if (s.isPlaced()) {
 					b.unplaceShip(s);
-					move = true;
 				}
 				do {
 					done = false;
@@ -100,6 +103,7 @@ public class AsciiGUI implements GUI {
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	private static void showBoard(String msg, byte[][] b) {
 		System.out.println(msg);
 		showBoard(b);
@@ -140,6 +144,7 @@ public class AsciiGUI implements GUI {
 		boolean done = false;
 		Ship[] ships = b.getShips();
 		
+		/******* TODO TESTING *******/
 		ships[0].setX(5);
 		ships[0].setY(5);
 		ships[0].rotate(0);
@@ -159,6 +164,7 @@ public class AsciiGUI implements GUI {
 			b.placeShip(s);
 		}
 		return b;
+		/******* TODO TESTING *******/
 		
 		/*do {
 			printTitle();
@@ -210,11 +216,11 @@ public class AsciiGUI implements GUI {
 	}
 
 	@Override
-	public int[] attack(Optional<Player> who) {
-		int[] ret = new int[3];
+	public Object[] attack(Optional<Player> who) {
+		Object[] ret = new Object[3];
 		
 		if (who.isEmpty()) {
-			ret[0] = -1;
+			ret[0] = null;
 			return ret;
 		}
 		
@@ -223,7 +229,6 @@ public class AsciiGUI implements GUI {
 		
 		ret[0] = p.getID();
 		
-		boolean done = false;
 		int x = numberChoice("x (-1 to go back): ", -1, Board.getWidth());
 		if (x < 0) {
 			ret[0] = -1;
@@ -253,7 +258,7 @@ public class AsciiGUI implements GUI {
 	}
 
 	@Override
-	public void endScreen(int myID, PlayerStatus myStatus, Duration duration, Short[] ids, String[] names, Stats[] stats) {
+	public void endScreen(UUID myID, PlayerStatus myStatus, Duration duration, UUID[] ids, String[] names, Stats[] stats) {
 		System.err.println("GAY FINITO");
 	}
 
@@ -408,59 +413,40 @@ public class AsciiGUI implements GUI {
 		}
 	}
 	
-	private int getAvailablePlayerCount(Player[] players) {
-		int count = 0;
-		for (Player p : players) {
-			if (p.getStatus() == PlayerStatus.READY || p.getStatus() == PlayerStatus.HAS_TURN) {
-				count++;
-			}
+	private Map<Integer, UUID> getIDMapping(Set<UUID> uuids) {
+		HashMap<Integer, UUID> ret = new HashMap<>();
+		int index = 1;
+		
+		for (UUID u : uuids) {
+			ret.put(index, u);
+			index++;
 		}
-		return count;
-	}
-
-	private HashMap<Short, Short> printPlayerList(Player me, Player[] players, Short[] noPrint) {
-		short index = 1;
-		HashMap<Short, Short> ret = new HashMap<>();
-		for (Player p : players) {
-			if (p.getID() != me.getID()) {
-				if (noPrint != null && !Arrays.asList(noPrint).contains(p.getID())) {
-					System.out.println(index + ". " + p.getUsername());
-					ret.put(index, p.getID());
-					index++;
-				} else if (noPrint == null) {
-					System.out.println(index + ". " + p.getUsername());
-					ret.put(index, p.getID());
-					index++;
-				}
-			}
-		}
+		
 		return ret;
 	}
 	
+	private void printPlayerList(Map<Integer, UUID> list, Map<UUID, Player> players) {
+		list.forEach((index, uuid) -> System.out.println(index + ". " + players.get(uuid).getUsername()));
+	}
+	
 	@Override
-	public Optional<Player> getWhoPlayer(String msg, Player me, Player[] players, Short[] noPrint) {
+	public Optional<Player> getWhoPlayer(String msg, Map<UUID, Player> players, Set<UUID> ignore) {
 		showPlayerField();
-		if (getAvailablePlayerCount(players) > 2) {
-			boolean hideDead = true;
-			do {
-				HashMap<Short, Short> ids = printPlayerList(me, players, noPrint);
-				int choice = numberChoice(msg, -1, ids.size());
-				if (choice == -1) {
-					return Optional.empty();
-				}
-				if (choice >= 1 && ids.get((short) choice) != me.getID()) {
-					return Optional.of(players[ids.get((short) choice)]);
-				}
-			} while (true);
-		} else {
-			for (Player p : players) {
-				if (p.getID() != me.getID() && (p.getStatus() == PlayerStatus.READY || p.getStatus() == PlayerStatus.HAS_TURN)) {
-					return Optional.of(p);
-				}
-			}
-		}
 		
-		return Optional.empty();
+		Set<UUID> temp = new HashSet<>(players.keySet());
+		temp.removeAll(ignore);
+		
+		if (temp.size() == 1) {
+			return Optional.ofNullable(players.get(temp.stream().findFirst().get()));
+		} else {
+			Map<Integer, UUID> idmap = getIDMapping(temp);
+			printPlayerList(idmap, players);
+			int choice = numberChoice(msg, -1, idmap.size());
+			if (choice == -1) {
+				return Optional.empty();
+			}
+			return Optional.ofNullable(players.get(idmap.get(choice)));
+		}
 	}
 
 	@Override

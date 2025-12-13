@@ -1,0 +1,14 @@
+{
+    "board": {
+        "width": 10,
+        "heigth": 10
+    },
+    "ships": [
+        {
+			"id": 1,
+            "length": 5,
+            "width": 1,
+            "sprite": ""
+        }
+    ]
+}
