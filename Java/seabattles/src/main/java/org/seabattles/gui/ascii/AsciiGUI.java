@@ -6,16 +6,20 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 
 import org.seabattles.interfaces.GUI;
 import org.seabattles.src.Board;
 import org.seabattles.src.Game;
+import org.seabattles.src.Game.GameStatus;
 import org.seabattles.src.GameConfig;
+import org.seabattles.src.Logger;
 import org.seabattles.src.GameConfig.GameDifficulty;
 import org.seabattles.src.Main;
 import org.seabattles.src.Player;
@@ -27,12 +31,14 @@ public class AsciiGUI implements GUI {
 	
 	private static final String title = Main.name + " - v" + Main.version;
 	
+	private Semaphore s;
 	private Scanner scan;
 	private Game game;
 	
 	public AsciiGUI(String[] args, Game g) {
 		game = g;
 		scan = new Scanner(System.in);
+		s = new Semaphore(1);
 	}
 	
 	@SuppressWarnings("unused")
@@ -47,11 +53,11 @@ public class AsciiGUI implements GUI {
 				do {
 					done = false;
 					try {
-						System.out.print("What X do you want to place the ship in? ");
+						print("What X do you want to place the ship in? ");
 						int x = Integer.parseInt(scan.nextLine());
-						System.out.print("What Y do you want to place the ship in? ");
+						print("What Y do you want to place the ship in? ");
 						int y = Integer.parseInt(scan.nextLine());
-						System.out.print("What rotation do you want the ship to have (0 = right, 1 = down, 2 = left, 3 = up)? ");
+						print("What rotation do you want the ship to have (0 = right, 1 = down, 2 = left, 3 = up)? ");
 						String c = scan.nextLine();
 						int r;
 						if (c.equals("r") || c.equals("right")) {
@@ -85,9 +91,9 @@ public class AsciiGUI implements GUI {
 		}
 	}
 	
-	private boolean yesNoQuestion(String msg) {
+	private boolean boolQuestion(String msg) {
 		do {
-			System.out.print(msg);
+			print(msg);
 			String rsp = scan.nextLine();
 			if (rsp.equals("1") || rsp.equalsIgnoreCase("y") || rsp.equalsIgnoreCase("s") || rsp.equalsIgnoreCase("si") || rsp.equalsIgnoreCase("yes")) {
 				return true;
@@ -97,44 +103,44 @@ public class AsciiGUI implements GUI {
 		} while (true);
 	}
 	
-	private static void showBoard(byte[][] b) {
+	private void showBoard(byte[][] b) {
 		for (int i = 0; i < b.length; i++) {
-			System.out.println(Arrays.toString(b[i]));
+			println(Arrays.toString(b[i]));
 		}
 	}
 	
 	@SuppressWarnings("unused")
-	private static void showBoard(String msg, byte[][] b) {
-		System.out.println(msg);
+	private void showBoard(String msg, byte[][] b) {
+		println(msg);
 		showBoard(b);
 	}
 	
-	private static void showBoard(String msg, Board b, boolean own) {
-		System.out.println(msg);
+	private void showBoard(String msg, Board b, boolean own) {
+		println(msg);
 		showBoard(b, own);
 	}
 	
-	private static void showBoard(Board b, boolean own) {
+	private void showBoard(Board b, boolean own) {
 		byte[][] hits = !own && !Game.DEBUG_MODE ? b.getObfuscatedHits() : b.getHits();
 		
-		System.out.print("\t");
+		print("\t");
 		for (int i = 0; i < hits.length; i++) {
-			System.out.print("[" + i + "]\t");
+			print("[" + i + "]\t");
 		}
-		System.out.println();
+		println();
 		
 		for (int i = 0; i < hits.length; i++) {
-			System.out.print("[" + i + "]\t");
+			print("[" + i + "]\t");
 			for (int j = 0; j < hits[i].length; j++) {
 				/*if (hits[i][j] != Board.NOTHING_FLAG) {
 					System.err.print(" " + hits[i][j] + "\t");
 					System.err.flush();
 				} else {*/
-					System.out.print(" " + hits[i][j] + "\t");
-					/*System.out.flush();
+					print(" " + hits[i][j] + "\t");
+					/*flush();
 				}*/
 			}
-			System.out.println();
+			println();
 		}
 	}
 
@@ -175,25 +181,25 @@ public class AsciiGUI implements GUI {
 				}
 			}
 			
-			System.out.print("Ships available to place: ");
+			print("Ships available to place: ");
 			for (int i = 0; i < ships.length; i++) {
 				if (!ships[i].isPlaced()) {
-					System.out.print("[id: " + ships[i].getID() + " l: " + ships[i].getLength() + " w: " + ships[i].getWidth() + "] ");
+					print("[id: " + ships[i].getID() + " l: " + ships[i].getLength() + " w: " + ships[i].getWidth() + "] ");
 				}
 			}
-			System.out.print("\nShips already placed: ");
+			print("\nShips already placed: ");
 			for (int i = 0; i < ships.length; i++) {
 				if (ships[i].isPlaced()) {
-					System.out.print("[id: " + ships[i].getID() + " l: " + ships[i].getLength() + " w: " + ships[i].getWidth() + "] ");
+					print("[id: " + ships[i].getID() + " l: " + ships[i].getLength() + " w: " + ships[i].getWidth() + "] ");
 				}
 			}
-			System.out.print("\nWhat ship do you want to place/move (-1 to skip)? ");
+			print("\nWhat ship do you want to place/move (-1 to skip)? ");
 			int choice;
 			try {
 				choice = Integer.parseInt(scan.nextLine());
 				if (choice != -1) {
 					placeShip(b, choice);
-					System.out.println("Ship status changed!");
+					println("Ship status changed!");
 					sleep(200);
 				}
 			} catch (NumberFormatException e) {}
@@ -231,13 +237,13 @@ public class AsciiGUI implements GUI {
 		
 		int x = numberChoice("x (-1 to go back): ", -1, Board.getWidth());
 		if (x < 0) {
-			ret[0] = -1;
+			ret[0] = null;
 			return ret;
 		}
 		
 		int y = numberChoice("y (-1 to go back): ", -1, Board.getHeigth());
 		if (y < 0) {
-			ret[0] = -1;
+			ret[0] = null;
 			return ret;
 		}
 		
@@ -252,14 +258,30 @@ public class AsciiGUI implements GUI {
 		printTitle();
 		showBoard("\t\t\t\t" + who.getUsername() + "\'s field", who.getBoard(), false);
 		if (waitInput) {
-			System.out.print("Type anything to go back");
+			print("Type anything to go back");
 			scan.nextLine();
 		}
 	}
 
 	@Override
-	public void endScreen(UUID myID, PlayerStatus myStatus, Duration duration, UUID[] ids, String[] names, Stats[] stats) {
-		System.err.println("GAY FINITO");
+	public void endScreen(UUID myID, PlayerStatus myStatus, Duration duration, Map<UUID, Object[]> playerStats) {
+		printTitle();
+		switch (myStatus) {
+			case LOSER:
+				println("YOU LOST!");
+				break;
+			case WINNER:
+				println("YOU WIN!");
+				break;
+			default:
+				break;
+		}
+		println("Finish time: " + duration.toMinutes() + "m " + duration.toSeconds() + "s");
+		
+		// Object[0] = String userName, Object[1] = Stats playerStats
+		
+		Object[] mystats = playerStats.get(myID);
+		println(((Stats) mystats[1]).toString());
 	}
 
 	@Override
@@ -271,7 +293,7 @@ public class AsciiGUI implements GUI {
 		
 		do {
 			value = -1;
-			System.out.print("Selezionare la modalità di gioco (0 = offline, 1 = crea un match, 2 = partecipa ad un match): ");
+			print("Selezionare la modalità di gioco (0 = offline, 1 = crea un match, 2 = partecipa ad un match): ");
 			choice = scan.nextLine();
 			try {
 				value = Integer.parseInt(choice);
@@ -292,7 +314,7 @@ public class AsciiGUI implements GUI {
 		
 		do {
 			ok = false;
-			System.out.print("Hai un file personalizzato di configurazione? ");
+			print("Hai un file personalizzato di configurazione? ");
 			rsp = scan.nextLine();
 			if (rsp.equalsIgnoreCase("s") || rsp.equalsIgnoreCase("y") || rsp.equalsIgnoreCase("n") || rsp.equals("1") || rsp.equals("0")) {
 				ok = true;
@@ -305,7 +327,7 @@ public class AsciiGUI implements GUI {
 		if (file) {
 			do {
 				ok = false;
-				System.out.print("Inserire il percorso del file di configurazione (lasciare vuoto per non inserire alcun file): ");
+				print("Inserire il percorso del file di configurazione (lasciare vuoto per non inserire alcun file): ");
 				rsp = scan.nextLine();
 				if (rsp.isEmpty()) {
 					break;
@@ -323,7 +345,7 @@ public class AsciiGUI implements GUI {
 		
 		do {
 			ok = false;
-			System.out.println("1) Normale\n2) Difficile\n3) Impossibile\n\nA quale difficoltà vuoi giocare?");
+			println("1) Normale\n2) Difficile\n3) Impossibile\n\nA quale difficoltà vuoi giocare?");
 			rsp = scan.nextLine();
 			try {
 				int value = Integer.parseInt(rsp);
@@ -349,7 +371,7 @@ public class AsciiGUI implements GUI {
 		
 		do {
 			ok = false;
-			System.out.println("Con quanti bot vuoi giocare? ");
+			println("Con quanti bot vuoi giocare? ");
 			rsp = scan.nextLine();
 			try {
 				int value = Integer.parseInt(rsp);
@@ -368,9 +390,9 @@ public class AsciiGUI implements GUI {
 	
 	private void printTitle() {
 		for (int i = 0; i < 10; i++) {
-			System.out.println();
+			println();
 		}
-		System.out.println(title);
+		println(title);
 	}
 
 	@Override
@@ -382,7 +404,7 @@ public class AsciiGUI implements GUI {
 	private int numberChoice(String msg, int min, int max) {
 		int ret;
 		do {
-			System.out.print(msg);
+			print(msg);
 			try {
 				ret = Integer.parseInt(scan.nextLine());
 				if (ret >= min && ret <= max) {
@@ -396,7 +418,7 @@ public class AsciiGUI implements GUI {
 	public GuiAction getAction() {
 		showPlayerField();
 		
-		System.out.println("1. Show field\n2. Attack\n3. Leave");
+		println("1. Show field\n2. Attack\n3. Leave");
 		int choice = numberChoice("What do you want to do? ", 1, 3);
 		
 		switch (choice) {
@@ -405,7 +427,7 @@ public class AsciiGUI implements GUI {
 			case 2:
 				return GuiAction.ATTACK;
 			case 3:
-				if (yesNoQuestion("Are you sure you want to leave? ")) {
+				if (boolQuestion("Are you sure you want to leave? ")) {
 					return GuiAction.QUIT;
 				}
 			default:
@@ -426,12 +448,12 @@ public class AsciiGUI implements GUI {
 	}
 	
 	private void printPlayerList(Map<Integer, UUID> list, Map<UUID, Player> players) {
-		list.forEach((index, uuid) -> System.out.println(index + ". " + players.get(uuid).getUsername()));
+		list.forEach((index, uuid) -> println(index + ". " + players.get(uuid).getUsername()));
 	}
 	
 	@Override
 	public Optional<Player> getWhoPlayer(String msg, Map<UUID, Player> players, Set<UUID> ignore) {
-		showPlayerField();
+		//showPlayerField();
 		
 		Set<UUID> temp = new HashSet<>(players.keySet());
 		temp.removeAll(ignore);
@@ -450,7 +472,160 @@ public class AsciiGUI implements GUI {
 	}
 
 	@Override
+	public void threadWriteDebug(String msg) {
+		try {
+			s.acquire();
+			System.err.println(msg);
+			s.release();
+		} catch (Exception e) {}
+	}
+	
+	public void print(String msg) {
+		try {
+			s.acquire();
+			System.out.print(msg);
+			s.release();
+		} catch (Exception e) {}
+	}
+	
+	public void println() {
+		print("\n");
+	}
+	
+	public void println(String msg) {
+		print(msg + "\n");
+	}
+	
+	private void printPlayerList() {
+		for (UUID id : game.getPlayers()) {
+			println("> " + game.getPlayer(id).get().getUsername());
+		}
+	}
+
+	@Override
+	public String[] getMultiplayerMode() {
+		String[] ret = new String[2];
+		printTitle();
+		println("1. Host match\n2. Connect to match");
+		int choice = numberChoice("Choice: ", 1, 2);
+		
+		print("Username: ");
+		String name = scan.nextLine();
+		name = name.trim().strip();
+		if (name.contains(" ")) {
+			name = name.substring(0, name.indexOf(' '));
+		}
+		ret[0] = name;
+		
+		switch (choice) {
+			case 1:
+				ret[1] = null;
+				break;
+			case 2:
+				print("IP address to connect to [eg. 127.0.0.1]: ");
+				String ip = scan.nextLine();
+				ip = ip.trim().strip();
+				if (ip.contains(" ")) {
+					ip = ip.substring(0, ip.indexOf(' '));
+				}
+				ret[2] = ip;
+				break;
+			default:
+				break;
+		}
+		
+		return ret;
+	}
+
+	@Override
 	public void invalidAttack(String msg) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void errorScreen(String msg) {
 		System.err.println(msg);
+	}
+	
+	@Override
+	public void executeMod(boolean ban) {
+		Map<UUID, Player> temp = new LinkedHashMap<>();
+		for (UUID u : game.getPlayers()) {
+			temp.put(u, game.getPlayer(u).get());
+		}
+		Set<UUID> ignore = new HashSet<>();
+		ignore.add(game.getOwnID());
+		
+		Optional<Player> ret = getWhoPlayer("Who you want to " + (ban ? "ban" : "kick") + " (-1 to go back)? ", temp, ignore);
+		if (ret.isPresent()) {
+			if (ban) {
+				game.getClient().sendBan(ret.get().getID());
+			} else {
+				game.getClient().sendKick(ret.get().getID());
+			}
+			game.getClient().acquire();
+		}
+	}
+
+	@Override
+	public boolean waitStartingGame(boolean isHost) {
+		if (isHost) {
+			int hide = 0;
+			do {
+				printTitle();
+				printPlayerList();
+				println("\n1. Refresh");
+				println("2. Kick player");
+				println("3. Ban player");
+				if (hide == 0) {
+					println("4. Start game");
+				}
+				int choice = numberChoice("Choice (-1 go back): ", -1, 4 - hide);
+				switch (choice) {
+					case -1:
+						return false;
+					case 1:
+						break;
+					case 2:
+						executeMod(false);
+						break;
+					case 3:
+						executeMod(true);
+						break;
+					case 4:
+						if (boolQuestion("Are you sure you want to start? ")) {
+							hide++;
+							game.getClient().sendStart();
+							game.getClient().acquire();
+						}
+						break;
+					default:
+						break;
+				}
+			} while (game.getStatus() != GameStatus.PLACING);
+		} else {
+			while (game.getStatus() != GameStatus.PLACING) {
+				try {
+					printTitle();
+					printPlayerList();
+					
+					println("\nWaiting game start");
+					
+					if (boolQuestion("0 refresh, 1 quit: ")) {
+						return false;
+					}
+					
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {}
+			}
+		}
+		return true;
+	}
+	
+	@Override
+	public void waitGameStart() {
+		showPlayerField();
+		game.getClient().acquire();
 	}
 }

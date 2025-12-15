@@ -20,9 +20,11 @@ import org.json.JSONObject;
 import org.seabattles.net.Protocol.MsgType;
 import org.seabattles.src.Board;
 import org.seabattles.src.Board.AttackStatus;
+import org.seabattles.src.Bot;
 import org.seabattles.src.Game;
 import org.seabattles.src.Game.GameStatus;
 import org.seabattles.src.GameConfig;
+import org.seabattles.src.Logger;
 import org.seabattles.src.Player;
 import org.seabattles.src.Stats;
 
@@ -35,8 +37,9 @@ public class Server implements Runnable {
 		STATUS_ERR
 	};
 
-	public static final short SERVER_PORT = (short) 42069;
+	public static final int SERVER_PORT = 42069;
 	public static final String SPRITE_PATH = "tmp_sprites";
+	public static final int BUF_SIZE = 4096;
 	
 	private static final byte MAX_CLIENTS = Game.MAX_PLAYERS;
 	
@@ -50,18 +53,13 @@ public class Server implements Runnable {
 	
 	private File spritesFolder;
 	
-	public Server(Game game) {
-		try {
-			socket = new ServerSocket(SERVER_PORT);
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.err.println(e.getMessage());
-		}
+	public Server(Game game) throws IOException {
+		socket = new ServerSocket(SERVER_PORT);
 		
 		this.game = game;
 		clients = new HashMap<>();
 		stop = false;
-		threadsPool = Executors.newFixedThreadPool((MAX_CLIENTS * 2) + 1); // + game thread
+		threadsPool = Executors.newFixedThreadPool(MAX_CLIENTS + 1); // + game thread
 		banList = new ArrayList<>();
 		host = null;
 		
@@ -69,13 +67,15 @@ public class Server implements Runnable {
 		if (!spritesFolder.exists()) {
 			spritesFolder.mkdir();
 		}
+		
+		write("Created server!");
 	}
 	
 	public File getSpritesFolder() {
 		return spritesFolder;
 	}
 	
-	private void destroy() {
+	public void destroy() {
 		stop = true;
 		
 		try {
@@ -83,15 +83,21 @@ public class Server implements Runnable {
 				c.stop();
 				c.destroy();
 			}
+			threadsPool.shutdown();
 			
 			if (socket != null) {
 				socket.close();
 			}
 			
-			for (File entry : spritesFolder.listFiles()) {
-				entry.delete();
+			if (spritesFolder != null) {
+				File[] files = spritesFolder.listFiles();
+				if (files != null) {
+					for (File entry : files) {
+						entry.delete();
+					}
+				}
+				spritesFolder.delete();
 			}
-			spritesFolder.delete();
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.err.println(e.getMessage());
@@ -110,8 +116,10 @@ public class Server implements Runnable {
 	@Override
 	public void run() {
 		try {
+			write("Server started");
 			while (!stop && !Thread.currentThread().isInterrupted()) {
 				Socket client = socket.accept();
+				write("Accepted client " + client);
 				if (!isBanned(client)) {
 					ClientWorker w = new ClientWorker(this, client);
 					if (sendConnStatus(w)) {
@@ -130,9 +138,11 @@ public class Server implements Runnable {
 				}
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
-			System.err.println(e.getMessage());
-			destroy();
+			if (!Thread.currentThread().isInterrupted()) {
+				e.printStackTrace();
+				System.err.println(e.getMessage());
+				destroy();
+			}
 		}
 	}
 	
@@ -145,16 +155,19 @@ public class Server implements Runnable {
 	}
 	
 	private boolean sendConnStatus(ClientWorker client) {
+		
 		JSONObject msg;
 		int nPlayers = game.getNumberOfPlayers();
 		if (clients.size() > nPlayers) {
 			msg = Protocol.getConnectionMessage(MsgType.CONN_FULL, null).orElse(new JSONObject());
+			client.sendMsg(msg);
 			handleDisconnect(client);
 			return false;
 		}
 		
 		if (game.getStatus() != Game.GameStatus.CONFIG) {
 			msg = Protocol.getConnectionMessage(MsgType.CONN_MATCH_STARTED, null).orElse(new JSONObject());
+			client.sendMsg(msg);
 			handleDisconnect(client);
 			return false;
 		}
@@ -165,7 +178,6 @@ public class Server implements Runnable {
 		} */
 		
 		msg = Protocol.getConnectionMessage(MsgType.CONN_SUCCESS, null).orElse(new JSONObject());
-		
 		client.sendMsg(msg);
 		
 		return true;
@@ -204,6 +216,7 @@ public class Server implements Runnable {
 	
 	private void parseUsername(UUID id, JSONObject msg) {
 		game.getPlayer(id).orElse(new Player()).setUsername(Protocol.parseUserNameMessage(msg));
+		clients.get(id).sendMsg(Protocol.getUserNameAcceptMessage(id));
 		broadcastPlayerList();
 	}
 	
@@ -215,11 +228,10 @@ public class Server implements Runnable {
 		clients.get(id).sendMsg(Protocol.getConfigHostAcceptMessage());
 	}
 	
-	private void parseConfigHost(UUID id, JSONObject msg) throws ParseException {
+	private void parseConfigHost(UUID id, JSONObject msg) throws IOException, ParseException {
 		if (id == host && game.getStatus() == GameStatus.CONFIG) {
 			GameConfig conf = Protocol.parseConfigurationMessage(msg);
 			game.setGameConfig(conf);
-			game.applyConfig();
 			sendHostAccept(id);
 		} else if (id != host) {
 			sendMatchNotHost(id);
@@ -267,18 +279,21 @@ public class Server implements Runnable {
 	}
 	
 	private void parseMatchPlcmStart(UUID id) {
-		if (id == host && game.getStatus() == GameStatus.CONFIG) {
-			broadcastMatchPlcmStarted();
-			
-			broadcastConfig(game.getGameConfig());
-			game.addBots();
-			broadcastPlayerList();
-			broadcastSprites();
-			
-			// START GAME THREAD
-			threadsPool.execute(game);
-		} else {
-			sendMatchNotHost(id);
+		synchronized (id) {
+			if (id == host && game.getStatus() == GameStatus.CONFIG) {
+				broadcastMatchPlcmStarted();
+				
+				broadcastConfig(game.getGameConfig());
+				game.addBots();
+				broadcastPlayerList();
+				broadcastSprites();
+				
+				// START GAME THREAD
+				game.setServer(this);
+				threadsPool.execute(game);
+			} else {
+				sendMatchNotHost(id);
+			}
 		}
 	}
 	
@@ -299,10 +314,14 @@ public class Server implements Runnable {
 		Optional<Board> optBoard = Protocol.parseConfigBoardMessage(msg, game.getGameConfig().getShipsConfig());
 		if (optBoard.isPresent()) {
 			Board b = optBoard.get();
-			if (b.checkAndPlace()) {
-				sendConfigBoardOk(id);
-			} else {
-				sendConfigBoardErr(id);
+			synchronized (this) {
+				if (b.checkAndPlace()) {
+					sendConfigBoardOk(id);
+					game.getPlayer(id).get().setBoard(b);
+					game.checkAllBoardsOk();
+				} else {
+					sendConfigBoardErr(id);
+				}
 			}
 		} else {
 			sendConfigBoardErr(id);
@@ -379,43 +398,50 @@ public class Server implements Runnable {
 		broadcast(Protocol.getChatRecvMessage(id, Protocol.parseChatSendMessage(msg)));
 	}
 	
-	public void parse(UUID id, JSONObject msg) {
-		try {
-			MsgType type = Protocol.getMessageType(msg);
-			switch (type) {
-				case USER_NAME:
-					parseUsername(id, msg);
-					break;
-				case CONFIG_HOST:
-					parseConfigHost(id, msg);
-					break;
-				case MOD:
-					parseModMsg(id, msg);
-					break;
-				case MATCH_PLCM_START:
-					parseMatchPlcmStart(id);
-					break;
-				case CONFIG_BOARD:
-					parseConfigBoard(id, msg);
-					break;
-				case BOARD_REQUEST:
-					parseBoardRequest(id, msg);
-					break;
-				case ATTACK:
-					parseAttackRequest(id, msg);
-					break;
-				case QUIT:
-					handleQuit(id);
-					break;
-				case CHAT_SEND:
-					parseChatMessage(id, msg);
-					break;
-				default:
-					break;
+	public void parse(UUID id, JSONObject[] msgs) {
+		for (JSONObject msg : msgs) {
+			try {
+				MsgType type = Protocol.getMessageType(msg);
+				switch (type) {
+					case USER_NAME:
+						parseUsername(id, msg);
+						break;
+					case CONFIG_HOST:
+						parseConfigHost(id, msg);
+						break;
+					case MOD:
+						parseModMsg(id, msg);
+						break;
+					case MATCH_PLCM_START:
+						parseMatchPlcmStart(id);
+						break;
+					case CONFIG_BOARD:
+						parseConfigBoard(id, msg);
+						break;
+					case BOARD_REQUEST:
+						parseBoardRequest(id, msg);
+						break;
+					case ATTACK:
+						parseAttackRequest(id, msg);
+						break;
+					case QUIT:
+						handleQuit(id);
+						break;
+					case CHAT_SEND:
+						parseChatMessage(id, msg);
+						break;
+					default:
+						break;
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+				clients.get(id).sendMsg(Protocol.getErrorMessage("An unexpected error occurred while parsing the message"));
 			}
-		} catch (Exception e) {
-			clients.get(id).sendMsg(Protocol.getErrorMessage("An unexpected error occurred while parsing the message"));
 		}
+	}
+	
+	private void write(String msg) {
+		Logger.write("[SERVER] " + msg);
 	}
 
 }

@@ -1,0 +1,38 @@
+{
+    "board": {
+        "width": 10,
+        "heigth": 10
+    },
+    "ships": [
+        {
+			"id": 1,
+            "length": 5,
+            "width": 1,
+            "sprite": ""
+        },
+        {
+			"id": 2,
+            "length": 4,
+            "width": 1,
+            "sprite": ""
+        },
+        {
+			"id": 3,
+            "length": 3,
+            "width": 1,
+            "sprite": ""
+        },
+        {
+			"id": 4,
+            "length": 3,
+            "width": 1,
+            "sprite": ""
+        },
+        {
+			"id": 5,
+            "length": 2,
+            "width": 1,
+            "sprite": ""
+        }
+    ]
+}

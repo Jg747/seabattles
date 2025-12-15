@@ -253,7 +253,7 @@ public class Board implements BoardInterface {
 	
 	public boolean checkAndPlace() {
 		for (Ship s : ships) {
-			if (s.getID() < 0 || s.getID() >= ships.length || !placeShip(s)) {
+			if (s.getID() - 1 < 0 || s.getID() - 1 >= ships.length || !placeShip(s)) {
 				return false;
 			}
 		}

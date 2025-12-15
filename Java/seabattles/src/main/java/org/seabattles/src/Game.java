@@ -2,6 +2,7 @@ package org.seabattles.src;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -20,6 +22,7 @@ import org.seabattles.interfaces.GUI;
 import org.seabattles.interfaces.GUI.GuiAction;
 import org.seabattles.net.Client;
 import org.seabattles.net.Server;
+import org.seabattles.net.Server.ConnStatus;
 import org.seabattles.src.Board.AttackStatus;
 import org.seabattles.src.GameConfig.GameDifficulty;
 import org.seabattles.src.Player.PlayerStatus;
@@ -41,6 +44,7 @@ public class Game implements Runnable {
 	
 	private Thread serverThread;
 	private Server server;
+	private Semaphore sem;
 	
 	private Thread recvThread;
 	private Client client;
@@ -70,7 +74,24 @@ public class Game implements Runnable {
 		status = GameStatus.CONFIG;
 		genericStatus = GenericStatus.UNDEFINED;
 		resource = null;
+		
+		client = null;
+		recvThread = null;
+		server = null;
+		serverThread = null;
+		
+		players = new LinkedHashMap<>();
+		
+		sem = new Semaphore(0);
 	}
+ 	
+ 	public boolean isServer() {
+ 		return server != null || serverThread != null;
+ 	}
+ 	
+ 	public void destroyServer() {
+ 		server.destroy();
+ 	}
  	
  	public void setGUI(GUI g) {
  		this.gui = g;
@@ -132,6 +153,10 @@ public class Game implements Runnable {
  		ownID = id;
  	}
  	
+ 	public UUID getOwnID() {
+ 		return ownID;
+ 	}
+ 	
  	// GUI INTERFACE
 	public void setNumberOfPlayers(short numberOfPlayers) {
 		config.setNumberOfPlayers(numberOfPlayers);
@@ -178,6 +203,9 @@ public class Game implements Runnable {
 		return status;
 	}
 	
+	public void setStatus(GameStatus status) {
+		this.status = status;
+	}
 	
 	public void setPlayerList(HashMap<UUID, String> users) {
 		players = new LinkedHashMap<>();
@@ -192,13 +220,10 @@ public class Game implements Runnable {
 		
 		Board.setWidth(config.getBoardWidth());
 		Board.setHeigth(config.getBoardHeigth());
-		
-		players = new LinkedHashMap<>();
 	}
 	
 	public UUID addPlayer() {
-		Player p = new Player(config.getShipsConfig());
-		p.generateBoard();
+		Player p = new Player();
 		players.put(p.getID(), p);
 		return p.getID();
 	}
@@ -215,16 +240,6 @@ public class Game implements Runnable {
 		}
 	}
 	
-	private void createAsHost() {
-		server = new Server(this);
-		serverThread = new Thread(server);
-		serverThread.start();
-		
-		createAsClient("127.0.0.1");
-		
-		client.sendConfiguration(config);
-	}
-	
 	// GUI INTERFACE
 	public Optional<Player> getPlayer(UUID id) {
 		return Optional.ofNullable(players.get(id));
@@ -234,44 +249,31 @@ public class Game implements Runnable {
 		return players.keySet();
 	}
 	
-	private void createAsClient(String ipAddress) {
-		client = new Client(ipAddress, this);
-		recvThread = new Thread(client);
-		recvThread.start();
-	}
-	
-	// GUI INTERFACE
-	public void create(Optional<String> ipAddress) {
-		if (!ipAddress.isPresent()) {
-			createAsHost();
-		} else {
-			createAsClient(ipAddress.get());
-		}
-		client.sendUsername();
-	}
-	
-	
 	public boolean doesExist(UUID id) {
 		return players.containsKey(id);
 	}
 	
 	
-	public void setGameConfig(GameConfig cfg) {
+	public void setGameConfig(GameConfig cfg) throws IOException, ParseException {
 		config = cfg;
+		config.applyConfigFile();
 	}
 	
 	public GameConfig getGameConfig() {
 		return config;
 	}
-
-	@Override
-	public void run() {
-		gameStartServer();
-	}
 	
 	private void createPlayersFromConfig() {
-		for (int i = 0; i < config.getNumberOfPlayers(); i++) {
-			addPlayer();
+		if (players.size() == 0) {
+			System.err.println("QUI");
+			for (int i = 0; i < config.getNumberOfPlayers(); i++) {
+				addPlayer();
+			}
+		}
+		
+		for (Player p : players.values()) {
+			p.setConfig(config);
+			p.generateBoard();
 		}
 		
 		addBots();
@@ -284,10 +286,6 @@ public class Game implements Runnable {
 	private boolean checkIfWinner(UUID winner) {
 		Set<UUID> alive = players.entrySet().stream().filter(e -> !e.getValue().isDead()).map(Map.Entry::getKey).collect(Collectors.toSet());
 		return alive.size() == 1 && alive.contains(winner);
-	}
-	
-	private void gameStartServer() {
-		// TODO online game management
 	}
 	
 	private Set<UUID> getPlayersPred(Predicate<Map.Entry<UUID, Player>> pred) {
@@ -406,22 +404,14 @@ public class Game implements Runnable {
 		}
 	}
 	
-	private Object[] getPlayerEndObj() {
-		Object[] ret = new Object[3];
-		
-		ret[0] = new UUID[players.size()];
-		ret[1] = new String[players.size()];
-		ret[2] = new Stats[players.size()];
-		
-		int index = 0;
+	private Map<UUID, Object[]> getPlayerEndObj() {
+		Map<UUID, Object[]> ret = new HashMap<>();
 		for (Map.Entry<UUID, Player> e : players.entrySet()) {
-			((UUID[]) ret[0])[index] = e.getKey();
-			((String[]) ret[1])[index] = e.getValue().getUsername();
-			((Stats[]) ret[2])[index] = e.getValue().getStats();
-			
-			index++;
+			Object[] obj = new Object[2];
+			obj[0] = e.getValue().getUsername();
+			obj[1] = e.getValue().getStats();
+			ret.put(e.getKey(), obj);
 		}
-		
 		return ret;
 	}
 	
@@ -454,8 +444,19 @@ public class Game implements Runnable {
 		}
 		
 		end = Instant.now();
-		Object[] ret = getPlayerEndObj();
-		gui.endScreen(ownID, getOwnPlayer().getStatus(), Duration.between(start, end), (UUID[]) ret[0], (String[]) ret[1], (Stats[]) ret[2]);
+		Map<UUID, Object[]> ret = getPlayerEndObj();
+		gui.endScreen(ownID, getOwnPlayer().getStatus(), Duration.between(start, end), ret);
+	}
+	
+	private void destroyAll() {
+		recvThread.interrupt();
+		client.destroy();
+		serverThread.interrupt();
+		server.destroy();
+	}
+	
+	public GUI getGUI() {
+		return gui;
 	}
 	
 	public void start() throws Exception {
@@ -471,19 +472,163 @@ public class Game implements Runnable {
 			setGameConfig(conf);
 		}*/
 		
-		int mode = 0;
+		/* TODO TESTING SINGLE */
+		/*int mode = 0;
 		GameConfig conf = new GameConfig();
 		conf.setNumberOfBots(2);
 		conf.setBotsDifficulty(GameDifficulty.NORMAL);
 		setGameConfig(conf);
-		conf.applyConfigFile();
+		/************************/		
+		
+		/* TODO TESTING SERVER */
+		int mode = 1;
+		GameConfig conf = new GameConfig();
+		conf.setNumberOfPlayers(1);
+		conf.setNumberOfBots(1);
+		conf.setBotsDifficulty(GameDifficulty.NORMAL);
+		setGameConfig(conf);
 		applyConfig();
+		/***********************/
 		
 		if (mode == 0) {
 			gameStart();
 		} else {
-			// crea server | get IP e connessione
+			gameStartMulti();
+			destroyAll();
 		}
+	}
+
+	
+	
+	/*********************************/
+	/*			SERVER SIDE			 */
+	/*********************************/
+	
+	private void gameStartMulti() throws IOException {
+		// TODO String[] sessionInfo = gui.getMultiplayerMode();
+		
+		String[] sessionInfo = new String[2];
+		sessionInfo[0] = "Dev";
+		sessionInfo[1] = null;
+		
+		if (!createSession(sessionInfo)) {
+			return;
+		}
+		
+		// GAME SECONDO IL CLIENT
+		boolean go = false;
+		Board b;
+		do {
+			b = gui.placeShips();
+			client.sendBoard(b);
+			client.acquire();
+			if (resource instanceof Boolean) {
+				go = (Boolean) resource;
+			}
+		} while (!go);
+		getOwnPlayer().setBoard(b);
+		
+		gui.waitGameStart();
+		
+		Logger.write("LOCAL CLIENT END - GAME STARTED");		
+	}
+	
+	private void createAsHost() throws IOException {
+		Game g = new Game();
+		g.setGUI(gui);
+		server = new Server(g);
+		serverThread = new Thread(server);
+		serverThread.start();
+		
+		createAsClient("127.0.0.1");
+
+		client.sendConfiguration(config);
+		client.acquire();
+	}
+	
+	private void createAsClient(String ipAddress) {
+		client = new Client(ipAddress, this);
+		if (client.getConnStatus() != ConnStatus.STATUS_OK) {
+			if (serverThread != null) {
+				serverThread.interrupt();
+			}
+			gui.errorScreen("Can't connect to server");
+		}
+		client.startRecvThread();
+	}
+	
+	public void createRecvThread() {
+		if (recvThread == null) {
+			recvThread = new Thread(client);
+			recvThread.start();
+		}
+	}
+	
+	// GUI INTERFACE
+	public boolean createSession(String[] sessionInfo) throws IOException {
+		if (sessionInfo[1] == null) {
+			createAsHost();
+		} else {
+			createAsClient(sessionInfo[1]);
+		}
+		
+		client.sendUsername(sessionInfo[0]);
+		client.acquire();
+		
+		return gui.waitStartingGame(sessionInfo[1] == null);
+	}
+	
+	public void checkAllBoardsOk() {
+		for (Player p : players.values()) {
+			if (!(p instanceof Bot)) {
+				for (Ship s : p.getBoard().getShips()) {
+					if (!s.isPlaced()) {
+						return;
+					}
+				}
+			}
+		}
+		
+		while (!sem.hasQueuedThreads()) {
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {}
+		}
+		release();
+	}
+	
+	public void release() {
+		sem.release();
+	}
+	
+	public void acquire() {
+		try {
+			sem.acquire();
+		} catch (InterruptedException e) {}
+	}
+	
+	public void setServer(Server server) {
+		this.server = server;
+	}
+	
+	@Override
+	public void run() {
+		// GAME SECONDO IL SERVER
+		status = GameStatus.PLACING;
+		players.values().stream().filter(e -> e instanceof Bot).forEach(b -> ((Bot) b).placeShips());
+		acquire();
+		
+		server.broadcastMatchStart();
+		
+		Logger.write("SERVER END - GAME PARTITO!");
+	}
+
+	@Override
+	public String toString() {
+		return "Game [serverThread=" + serverThread + ", server=" + server + ", sem=" + sem + ", recvThread="
+				+ recvThread + ", client=" + client + ", config=" + config + ", players=" + players + ", gui=" + gui
+				+ ", ownID=" + ownID + ", turn=" + turn + ", status=" + status + ", start=" + start + ", end=" + end
+				+ ", genericStatus=" + genericStatus + ", errMsg=" + errMsg + ", resource=" + resource + "]";
 	}
 	
 }

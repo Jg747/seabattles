@@ -10,14 +10,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 
 import org.json.JSONObject;
 import org.seabattles.net.Protocol.MsgType;
 import org.seabattles.net.Server.ConnStatus;
 import org.seabattles.src.Board;
 import org.seabattles.src.Game;
-import org.seabattles.src.Game.GenericStatus;
+import org.seabattles.src.Game.GameStatus;
 import org.seabattles.src.GameConfig;
+import org.seabattles.src.Logger;
 import org.seabattles.src.Player;
 import org.seabattles.src.Stats;
 
@@ -27,20 +29,31 @@ public class Client implements Runnable {
 	private InputStream in;
 	private PrintWriter out;
 	
+	private byte[] buffer;
+	
 	private boolean interrupted;
 	
 	private ConnStatus connStatus;
 	private String errorMsg;
 	
-	private Game game;
+	public Game game;//
 	
 	public Client(String ipAddress, Game game) {
+		this.game = game;
+		
 		try {
 			sock = new Socket(ipAddress, Server.SERVER_PORT);
 			in = sock.getInputStream();
 			out = new PrintWriter(sock.getOutputStream());
 			
-			if (!connOk(waitMsg().get())) {
+			buffer = new byte[Server.BUF_SIZE];
+			
+			write("Created client - connected to " + sock);
+			write("Waiting for ConnStatus");
+			
+			Object[] obj = waitMsg().get();
+			if (!(obj instanceof JSONObject[]) || !connOk((JSONObject) obj[0])) {
+				write("Received ConnError, terminating");
 				this.destroy();
 			}
 		} catch (IOException e) {
@@ -48,12 +61,16 @@ public class Client implements Runnable {
 			System.err.println(e);
 		}
 		
-		this.game = game;
 		interrupted = false;
 	}
 	
+	public void startRecvThread() {
+		write("Received ConnOk, starting RecvThread");
+		game.createRecvThread();
+	}
+	
 	// GUI INTERFACE
-	private ConnStatus getConnStatus() {
+	public ConnStatus getConnStatus() {
 		return connStatus;
 	}
 	
@@ -64,22 +81,22 @@ public class Client implements Runnable {
 	
 	private boolean connOk(JSONObject msg) {
 		Map<MsgType, String> status = Protocol.parseConnectionMessage(msg);
-		if (((MsgType[])status.keySet().toArray())[0] == MsgType.CONN_SUCCESS) {
+		if (status.keySet().contains(MsgType.CONN_SUCCESS)) {
 			connStatus = Server.ConnStatus.STATUS_OK;
 			return true;
 		}
 		
-		if (((MsgType[])status.keySet().toArray())[0] == MsgType.CONN_FULL) {
+		if (status.keySet().contains(MsgType.CONN_FULL)) {
 			connStatus = Server.ConnStatus.STATUS_FULL;
 		}
 		
-		if (((MsgType[])status.keySet().toArray())[0] == MsgType.CONN_MATCH_STARTED) {
+		if (status.keySet().contains(MsgType.CONN_MATCH_STARTED)) {
 			connStatus = Server.ConnStatus.STATUS_STARTED;
 		}
 		
-		if (((MsgType[])status.keySet().toArray())[0] == MsgType.CONN_ERR) {
+		if (status.keySet().contains(MsgType.CONN_ERR)) {
 			connStatus = Server.ConnStatus.STATUS_ERR;
-			errorMsg = status.get(((MsgType[])status.keySet().toArray())[0]);
+			errorMsg = status.get(MsgType.CONN_ERR);
 		}
 		
 		return false;
@@ -97,21 +114,34 @@ public class Client implements Runnable {
 		}
 	}
 
-	public Optional<JSONObject> waitMsg() {
+	public Optional<Object[]> waitMsg() {
 		try {
-			// TODO InputStream.readAllBytes() does NOT differentiate between data from multiple sources (problemi nel caso speciale sprites_send)
-			JSONObject ret = new JSONObject(new String(in.readAllBytes()));
-			return Optional.of(ret);
+			int len = in.read(buffer);
+			if ((len > 2 && buffer[0] == '{' && buffer[1] == '\"') || len == 2 && buffer[0] == '{' && buffer[1] == '}') {
+				String[] msgs = new String(buffer, 0, len).split("\\n");
+				JSONObject[] ret = new JSONObject[msgs.length];
+				for (int i = 0; i < msgs.length; i++) {
+					ret[i] = new JSONObject(msgs[i]);
+					write("Received msg: \'" + ret[i] + "\'");
+				}
+				return Optional.of((Object[]) ret);
+			} else {
+				// TODO SPRITE
+			}
 		} catch (IOException e) {
-			e.printStackTrace();
-			System.err.println(e);
-			destroy();
+			if (!Thread.currentThread().isInterrupted()) {
+				e.printStackTrace();
+				System.err.println(e);
+				destroy();
+			}
 		}
 		return Optional.empty();
 	}
 	
 	public void sendMsg(String msg) {
+		write("Sending msg: \'" + msg + "\'");
 		out.println(msg);
+		out.flush();
 	}
 	
 	public void sendMsg(JSONObject msg) {
@@ -126,10 +156,16 @@ public class Client implements Runnable {
 
 	@Override
 	public void run() {
+		write("Started RecvThread");
 		while (!interrupted && !Thread.currentThread().isInterrupted()) {
-			Optional<JSONObject> ret = waitMsg();
+			Optional<Object[]> ret = waitMsg();
 			if (ret.isPresent()) {
-				parse(ret.get());
+				Object obj = ret.get();
+				if (obj instanceof JSONObject[]) {
+					parse((JSONObject[]) obj);
+				} else {
+					// SPRITES
+				}
 			}
 		}
 	}
@@ -139,7 +175,7 @@ public class Client implements Runnable {
 		return game.getOwnPlayer();
 	}
 	
-	private void parseGameConfig(JSONObject obj) throws ParseException {
+	private void parseGameConfig(JSONObject obj) throws IOException, ParseException {
 		GameConfig cfg = Protocol.parseConfigurationMessage(obj);
 		game.setGameConfig(cfg);
 	}
@@ -153,8 +189,10 @@ public class Client implements Runnable {
 	}
 	
 	private void parseModMessage(JSONObject msg) {
-		game.setErrMsg((Boolean) Protocol.parseModMessage(msg)[1] ? "ban" : "kick" );
+		game.setErrMsg((Boolean) Protocol.parseModMessage(msg)[1] ? "ban" : "kick");
 		this.destroy();
+		// TODO got kicked/banned
+		throw new RuntimeException(game.getErrMsg());
 	}
 	
 	private void getSprites(JSONObject msg) {
@@ -225,98 +263,125 @@ public class Client implements Runnable {
 		// TODO notify GUI
 	}
 	
-	private void parse(JSONObject msg) {
-		try {
-			MsgType type = Protocol.getMessageType(msg);
-			switch (type) {
-				case CONN_SUCCESS:
-					Thread.sleep(100);
-					sendIDRequest();
-					break;
-				case CONN_FULL:
-					game.setErrMsg("Server full");
-					this.destroy();
-					break;
-				case CONN_MATCH_STARTED:
-					game.setErrMsg("Match has already started");
-					this.destroy();
-					break;
-				case CONN_ERR:
-					parseConnErrMsg(msg);
-					this.destroy();
-					break;
-				case USER_LIST:
-					parseUserList(msg);
-					break;
-				case ID_SEND:
-					parseIDSend(msg);
-					break;
-				case MATCH_NOT_HOST:
-					changeStatus("not host");
-					break;
-				case CONFIG_HOST_ACCEPT:
-					changeStatus("ok");
-					break;
-				case MOD_EXECUTED:
-					changeStatus("ok");
-					break;
-				case CONFIG:
-					parseGameConfig(msg);
-					break;
-				case MOD:
-					parseModMessage(msg);
-					break;
-				case MATCH_PLCM_STARTED:
-					changeStatus("ok");
-					break;
-				case SPRITES_SEND:
-					getSprites(msg);
-					break;
-				case MATCH_START:
-					changeStatus("ok");
-					break;
-				case TURN:
-					setTurn(msg);
-					break;
-				case BOARD:
-					parseBoard(msg);
-					changeStatus("ok");
-					break;
-				case ATTACK_STATUS:
-					changeStatus(parseAttackStatus(msg));
-					break;
-				case GOT_ATTACKED:
-					parseGotAttacked(msg);
-					break;
-				case MATCH_END:
-					parseMatchEnd(msg);
-					break;
-				case LEFT:
-					parsePlayerQuit(msg);
-					break;
-				case CHAT_RECV:
-					handleChat(msg);
-					break;
-				default:
-					break;
+	private void parseUserNameAccept(JSONObject msg) {
+		game.setOwnID(Protocol.parseUserNameAcceptMessage(msg));
+	}
+	
+	private void parse(JSONObject[] msgs) {
+		for (JSONObject msg : msgs) {
+			try {
+				MsgType type = Protocol.getMessageType(msg);
+				switch (type) {
+					case CONN_SUCCESS:
+						Thread.sleep(100);
+						sendIDRequest();
+						break;
+					case CONN_FULL:
+						game.setErrMsg("Server full");
+						this.destroy();
+						break;
+					case CONN_MATCH_STARTED:
+						game.setErrMsg("Match has already started");
+						this.destroy();
+						break;
+					case CONN_ERR:
+						parseConnErrMsg(msg);
+						this.destroy();
+						break;
+					case USER_NAME_ACCEPT:
+						parseUserNameAccept(msg);
+						release();
+						break;
+					case CONFIG_BOARD_OK:
+						game.setResource(new Boolean(true));
+						release();
+						break;
+					case CONFIG_BOARD_ERR:
+						game.setResource(new Boolean(false));
+						release();
+					case USER_LIST:
+						parseUserList(msg);
+						break;
+					case ID_SEND:
+						parseIDSend(msg);
+						break;
+					case MATCH_NOT_HOST:
+						game.setErrMsg("not host");
+						release();
+						break;
+					case CONFIG_HOST_ACCEPT:
+						release();
+						break;
+					case MOD_EXECUTED:
+						release();
+						break;
+					case CONFIG:
+						parseGameConfig(msg);
+						break;
+					case MOD:
+						parseModMessage(msg);
+						break;
+					case MATCH_PLCM_STARTED:
+						game.setStatus(GameStatus.PLACING);
+						release();
+						break;
+					case SPRITES_SEND:
+						getSprites(msg);
+						break;
+					case MATCH_START:
+						release();
+						break;
+					case TURN:
+						setTurn(msg);
+						break;
+					case BOARD:
+						parseBoard(msg);
+						changeStatus("ok");
+						break;
+					case ATTACK_STATUS:
+						changeStatus(parseAttackStatus(msg));
+						break;
+					case GOT_ATTACKED:
+						parseGotAttacked(msg);
+						break;
+					case MATCH_END:
+						parseMatchEnd(msg);
+						break;
+					case LEFT:
+						parsePlayerQuit(msg);
+						break;
+					case CHAT_RECV:
+						handleChat(msg);
+						break;
+					default:
+						break;
+				}
+			} catch (Exception e) {
+				this.destroy();
 			}
-		} catch (Exception e) {
-			this.destroy();
 		}
 	}
 	
+	public void acquire() {
+		game.acquire();
+	}
+	
+	public void release() {
+		game.release();
+	}
+	
 	private void changeStatus(String str) {
-		while (game.getGenericStatus() != GenericStatus.CHANGING);
+		/*while (game.getGenericStatus() != GenericStatus.CHANGING);
 		game.setErrMsg(str);
-		game.changeGenericStatus();
+		game.changeGenericStatus();*/
 	}
 	
 	public void sendConfiguration(GameConfig config) {
 		sendMsg(Protocol.getConfigurationMessage(config));
 	}
 	
-	public void sendUsername() {
-		sendMsg(Protocol.getUserNameMessage(game.getOwnPlayer().getUsername()));
+	public void sendUsername(String userName) {
+		sendMsg(Protocol.getUserNameMessage(userName));
 	}
 	
 	// GUI INTERFACE
@@ -362,6 +427,10 @@ public class Client implements Runnable {
 	// GUI INTERFACE
 	public void sendChatMessage(String msg) {
 		sendMsg(Protocol.getChatSendMessage(msg));
+	}
+	
+	private void write(String msg) {
+		Logger.write("[LOCAL CLIENT] " + msg);
 	}
 	
 }

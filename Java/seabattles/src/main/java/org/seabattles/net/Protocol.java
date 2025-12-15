@@ -13,6 +13,7 @@ import org.json.JSONObject;
 import org.seabattles.src.Board;
 import org.seabattles.src.Board.AttackStatus;
 import org.seabattles.src.GameConfig;
+import org.seabattles.src.Logger;
 import org.seabattles.src.GameConfig.GameDifficulty;
 import org.seabattles.src.Player.PlayerGrade;
 import org.seabattles.src.Ship;
@@ -37,6 +38,7 @@ public abstract class Protocol {
 		CONFIG_BOARD_ERR,
 		
 		USER_NAME,
+		USER_NAME_ACCEPT,
 		USER_LIST,
 		ID_REQUEST,
 		ID_SEND,
@@ -115,6 +117,7 @@ public abstract class Protocol {
 	private static final Map<MsgString, String> strings = Map.ofEntries(
 		Map.entry(MsgString.TYPE, "type"),
 		Map.entry(MsgString.MSG, "msg"),
+		Map.entry(MsgString.NAME, "name"),
 		Map.entry(MsgString.CFG, "cfg"),
 		Map.entry(MsgString.BOARD, "board"),
 		Map.entry(MsgString.SHIPS, "ships"),
@@ -164,6 +167,7 @@ public abstract class Protocol {
 			Map.entry(MsgType.CONFIG_BOARD_OK, "config_board_ok"),
 			Map.entry(MsgType.CONFIG_BOARD_ERR, "config_board_err"),
 			Map.entry(MsgType.USER_NAME, "user_name"),
+			Map.entry(MsgType.USER_NAME_ACCEPT, "user_name_accept"),
 			Map.entry(MsgType.USER_LIST, "user_list"),
 			Map.entry(MsgType.ID_REQUEST, "id_request"),
 			Map.entry(MsgType.ID_SEND, "id_send"),
@@ -224,7 +228,7 @@ public abstract class Protocol {
 	}
 	
 	public static Map<MsgType, String> parseConnectionMessage(JSONObject msg) {
-		return Map.of(Protocol.getMessageType(msg), msg.getString(strings.get(MsgString.MSG)));
+		return Map.of(Protocol.getMessageType(msg), msg.keySet().contains(strings.get(MsgString.MSG)) ? msg.getString(strings.get(MsgString.MSG)) : "null");
 	}
 	
 	public static Optional<JSONObject> getUserNameMessage(String name) {
@@ -236,6 +240,17 @@ public abstract class Protocol {
 	
 	public static String parseUserNameMessage(JSONObject obj) {
 		return obj.getString(strings.get(MsgString.MSG));
+	}
+	
+	public static JSONObject getUserNameAcceptMessage(UUID id) {
+		JSONObject obj = new JSONObject();
+		obj.put(strings.get(MsgString.TYPE), types.get(MsgType.USER_NAME_ACCEPT));
+		obj.put(strings.get(MsgString.ID), id.toString());
+		return obj;
+	}
+	
+	public static UUID parseUserNameAcceptMessage(JSONObject obj) {
+		return UUID.fromString(obj.getString(strings.get(MsgString.ID)));
 	}
 	
 	private static Optional<JSONObject> putConfigInObj(JSONObject obj, GameConfig config) {
@@ -420,6 +435,7 @@ public abstract class Protocol {
 		JSONObject ret = new JSONObject();
 		ret.put(strings.get(MsgString.TYPE), types.get(MsgType.CONFIG_BOARD));
 		
+		JSONArray arr = new JSONArray();
 		Ship[] ships = board.getShips();
 		for (Ship s : ships) {
 			JSONObject obj = new JSONObject();
@@ -427,8 +443,11 @@ public abstract class Protocol {
 			obj.put(strings.get(MsgString.X), s.getX());
 			obj.put(strings.get(MsgString.Y), s.getY());
 			obj.put(strings.get(MsgString.R), s.getRotation());
+			arr.put(obj);
 		}
-		return Optional.empty();
+		ret.put(strings.get(MsgString.SHIPS), arr);
+		
+		return Optional.of(ret);
 	}
 	
 	public static Optional<Board> parseConfigBoardMessage(JSONObject msg, ShipConfig[] cfg) {
@@ -441,7 +460,7 @@ public abstract class Protocol {
 		
 		Ship[] ships = ret.getShips();
 		for (Object o : arr) {
-			int id = ((JSONObject) o).getInt(strings.get(MsgString.ID));
+			int id = ((JSONObject) o).getInt(strings.get(MsgString.ID)) - 1;
 			ships[id].setX(((JSONObject) o).getInt(strings.get(MsgString.X)));
 			ships[id].setY(((JSONObject) o).getInt(strings.get(MsgString.Y)));
 			ships[id].rotate(((JSONObject) o).getInt(strings.get(MsgString.R)));

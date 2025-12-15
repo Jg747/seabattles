@@ -10,7 +10,6 @@ import org.seabattles.src.Board;
 import org.seabattles.src.GameConfig;
 import org.seabattles.src.Player;
 import org.seabattles.src.Player.PlayerStatus;
-import org.seabattles.src.Stats;
 
 public interface GUI {
 	public enum GuiAction {
@@ -23,12 +22,23 @@ public interface GUI {
 	
 	public int getMode();
 	public GameConfig configGame() throws Exception;
+	public String[] getMultiplayerMode();	// String[0] = Username, String[1] = IPv4
+	public boolean waitStartingGame(boolean isHost);
+	public void executeMod(boolean ban);
+	public void waitGameStart();
+	
 	public Board placeShips();
 	public void showPlayerField();
 	public GuiAction getAction();
 	public Optional<Player> getWhoPlayer(String msg, Map<UUID, Player> players, Set<UUID> ignore);
 	public void showField(Player who, boolean waitInput);
 	public Object[] attack(Optional<Player> who);	// int[0] = id, int[1] = x, int[2] = y
+	
 	public void invalidAttack(String msg);
-	public void endScreen(UUID myID, PlayerStatus myStatus, Duration duration, UUID[] ids, String[] names, Stats[] stats);
+	
+	public void endScreen(UUID myID, PlayerStatus myStatus, Duration duration, Map<UUID, Object[]> playerStats);
+	
+	public void errorScreen(String msg);
+	
+	public void threadWriteDebug(String msg);
 }

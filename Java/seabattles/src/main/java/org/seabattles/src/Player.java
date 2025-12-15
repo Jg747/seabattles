@@ -31,9 +31,15 @@ public class Player implements PlayerInterface {
 	protected Stats stats;
 	protected PlayerStatus status;
 	
-	public Player() {}
+	public Player() {
+		id = UUID.randomUUID();
+		status = PlayerStatus.NOT_READY;
+	}
 	
 	public Player(ShipConfig[] shipsConfig) {
+		id = UUID.randomUUID();
+		status = PlayerStatus.NOT_READY;
+		
 		init(shipsConfig);
 	}
 	
@@ -70,9 +76,6 @@ public class Player implements PlayerInterface {
 	private void init(ShipConfig[] shipsConfig) {
 		board = new Board(shipsConfig);
 		stats = new Stats();
-		
-		id = UUID.randomUUID();
-		status = PlayerStatus.NOT_READY;
 	}
 	
 	public void setStatus(PlayerStatus newStatus) {
@@ -109,7 +112,7 @@ public class Player implements PlayerInterface {
 				break;
 			case SUNK:
 				stats.incSunk();
-				if (who.getStatus() == PlayerStatus.LOSER) {
+				if (who.getBoard().allShipsGone()) {
 					stats.incEliminations();
 				}
 				break;
@@ -146,6 +149,11 @@ public class Player implements PlayerInterface {
 		updateStats(who, status);
 		
 		return status;
+	}
+	
+	@Override
+	public String toString() {
+		return "ID: " + id + "\nName: " + userName;
 	}
 
 	// GUI interface

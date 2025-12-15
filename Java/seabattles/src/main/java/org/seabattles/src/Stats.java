@@ -98,4 +98,15 @@ public class Stats {
 		computeGrade();
 		return grade;
 	}
+	
+	@Override
+	public String toString() {
+		String ret = "Number of shots: " + numberOfShots + "\n"
+				   + "Number of hits: " + numberOfHits + "\n"
+				   + "Number of sunk ships: " + numberOfSunkShips + "\n"
+				   + "You eliminated " + numberOfPlayerEliminations + " players!\n"
+				   + "\nYour grade: " + getGrade();
+		return ret;
+	}
+
 }

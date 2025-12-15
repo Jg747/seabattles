@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.json.JSONObject;
+import org.seabattles.src.Logger;
 
 public class ClientWorker implements Runnable {
 	
@@ -19,6 +20,7 @@ public class ClientWorker implements Runnable {
 		private Socket sock;
 		private InputStream in;
 		private PrintWriter out;
+		private byte[] buffer;
 		
 		private UUID id;
 		
@@ -33,16 +35,28 @@ public class ClientWorker implements Runnable {
 				System.err.println(e);
 				destroy();
 			}
+			
+			buffer = new byte[Server.BUF_SIZE];
 		}
 		
 		public void setID(UUID id) {
 			this.id = id;
 		}
 		
-		public Optional<JSONObject> waitMsg() {
+		public Optional<JSONObject[]> waitMsg() {
 			try {
-				JSONObject ret = new JSONObject(new String(in.readAllBytes()));
-				return Optional.of(ret);
+				int len = in.read(buffer);
+				if ((len > 2 && buffer[0] == '{' && buffer[1] == '\"') || len == 2 && buffer[0] == '{' && buffer[1] == '}') {
+					String[] msgs = new String(buffer, 0, len).split("\\n");
+					JSONObject[] ret = new JSONObject[msgs.length];
+					for (int i = 0; i < msgs.length; i++) {
+						ret[i] = new JSONObject(msgs[i]);
+						write("Received msg: \'" + ret[i] + "\'");
+					}
+					return Optional.of(ret);
+				} else {
+					// TODO SPRITE
+				}
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.err.println(e);
@@ -52,7 +66,9 @@ public class ClientWorker implements Runnable {
 		}
 		
 		public void sendMsg(String msg) {
+			write("Sending msg: \'" + msg + "\'");
 			out.println(msg);
+			out.flush();
 		}
 		
 		@SuppressWarnings("unused")
@@ -102,8 +118,9 @@ public class ClientWorker implements Runnable {
 	
 	@Override
 	public void run() {
+		write("Started worker for IP " + client.getSocket());
 		while (!interrupted && !Thread.currentThread().isInterrupted()) {
-			Optional<JSONObject> ret = client.waitMsg();
+			Optional<JSONObject[]> ret = client.waitMsg();
 			if (ret.isPresent()) {
 				serv.parse(client.getID(), ret.get());
 			}
@@ -112,6 +129,10 @@ public class ClientWorker implements Runnable {
 	
 	public InetAddress getIP() {
 		return client.getSocket().getInetAddress();
+	}
+	
+	private String shortID() {
+		return client.getID().toString().substring(0, 5);
 	}
 	
 	public void sendMsg(String msg) {
@@ -128,4 +149,12 @@ public class ClientWorker implements Runnable {
 		}
 	}
 
+	private void write(String msg) {
+		if (client.getID() != null) {
+			Logger.write("[SERVER <-> \'" + shortID() + "\' | " + client.getSocket().getInetAddress() + "] " + msg);
+		} else {
+			Logger.write("[SERVER <-> " + client.getSocket().getInetAddress() + "] " + msg);
+		}
+	}
+	
 }
