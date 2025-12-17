@@ -60,6 +60,14 @@ Invio del proprio nome utente
 }
 ```
 
+### Risposta (Server)
+```json
+{
+	"type": "user_name_accept",
+	"id": {id}
+}
+```
+
 ## 4 Configurazione del game
 ### Invio (Client)
 Invio della configurazione della board, delle navi
@@ -411,6 +419,7 @@ Match terminato
 {
 	"type": "match_end",
 	"duration": {duration},
+	"winner": {id},
 	"players": [
 		{
 			"id": {id},
@@ -436,6 +445,15 @@ Il client non ha il turno
 {
 	"type": "eliminated",
 	"by": {id}
+}
+```
+
+### Invio (Server)
+Il server fa il broadcast dell'eliminazione
+```json
+{
+	"type": "player_elimination",
+	"id": {id}
 }
 ```
 
@@ -478,7 +496,7 @@ Il client richiesto non e' disponibile
 }
 ```
 
-## 18 Richiesta ID
+## [Deprecated] 18 Richiesta ID
 ### Invio (Client)
 Invio richiesta del proprio ID all'interno del server
 ```json
@@ -496,7 +514,7 @@ Risposta contenente l'ID del giocatore all'interno del server (serve per la sinc
 }
 ```
 
-## 19 Errori e messaggi di controlli
+## 19 Errori e messaggi di controllo
 ### Invio (Server)
 Invio di un messaggio di errore generico
 ```json
@@ -514,7 +532,8 @@ Invio del messaggio per avvisare i client che sta per trasmettere le sprites
 	"sprites": [
 		{
 			"id": {ship_id},
-			"name": {fileName}
+			"name": {fileName},
+			"data": {base64data}
 		}
 	]
 }

@@ -1,16 +1,22 @@
 package org.seabattles.net;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.ParseException;
-import java.time.Duration;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.Semaphore;
 
 import org.json.JSONObject;
 import org.seabattles.net.Protocol.MsgType;
@@ -20,39 +26,37 @@ import org.seabattles.src.Game;
 import org.seabattles.src.Game.GameStatus;
 import org.seabattles.src.GameConfig;
 import org.seabattles.src.Logger;
+import org.seabattles.src.Main;
 import org.seabattles.src.Player;
-import org.seabattles.src.Stats;
+import org.seabattles.src.Player.PlayerStatus;
+import org.seabattles.src.ShipConfig;
 
 public class Client implements Runnable {
 	
 	private Socket sock;
-	private InputStream in;
+	private BufferedReader in;
 	private PrintWriter out;
-	
-	private byte[] buffer;
 	
 	private boolean interrupted;
 	
 	private ConnStatus connStatus;
 	private String errorMsg;
 	
-	public Game game;//
+	private Game game;
 	
 	public Client(String ipAddress, Game game) {
 		this.game = game;
 		
 		try {
 			sock = new Socket(ipAddress, Server.SERVER_PORT);
-			in = sock.getInputStream();
+			in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
 			out = new PrintWriter(sock.getOutputStream());
-			
-			buffer = new byte[Server.BUF_SIZE];
 			
 			write("Created client - connected to " + sock);
 			write("Waiting for ConnStatus");
 			
-			Object[] obj = waitMsg().get();
-			if (!(obj instanceof JSONObject[]) || !connOk((JSONObject) obj[0])) {
+			Object[] obj = waitMsg().orElse(null);
+			if (obj == null || !(obj instanceof JSONObject[]) || !connOk((JSONObject) obj[0])) {
 				write("Received ConnError, terminating");
 				this.destroy();
 			}
@@ -62,6 +66,14 @@ public class Client implements Runnable {
 		}
 		
 		interrupted = false;
+	}
+	
+	public boolean isConnected() {
+		if (sock.isClosed()) {
+			game.setErrMsg("Disconnected from the server");
+			return false;
+		}
+		return true;
 	}
 	
 	public void startRecvThread() {
@@ -77,6 +89,23 @@ public class Client implements Runnable {
 	// GUI INTERFACE
 	private String getErrorMsg() {
 		return errorMsg;
+	}
+	
+	public void sendSprites(ShipConfig[] ships) throws Exception {
+		Map<Integer, String[]> toSend = new HashMap<>();
+		for (ShipConfig s : ships) {
+			String[] data = new String[2];
+			if (!s.getSpritePath().equals(Protocol.NULL)) {
+				data[0] = s.getSpritePath();
+				data[1] = new String(Base64.getEncoder().encode(Files.readAllBytes(Paths.get(s.getSpritePath()))), "UTF-8");
+			} else {
+				data[0] = Protocol.NULL;
+				data[1] = "";
+			}
+			toSend.put(s.getID(), data);
+		}
+		
+		sendMsg(Protocol.getSpritesSendMessage(toSend));
 	}
 	
 	private boolean connOk(JSONObject msg) {
@@ -116,22 +145,16 @@ public class Client implements Runnable {
 
 	public Optional<Object[]> waitMsg() {
 		try {
-			int len = in.read(buffer);
-			if ((len > 2 && buffer[0] == '{' && buffer[1] == '\"') || len == 2 && buffer[0] == '{' && buffer[1] == '}') {
-				String[] msgs = new String(buffer, 0, len).split("\\n");
-				JSONObject[] ret = new JSONObject[msgs.length];
-				for (int i = 0; i < msgs.length; i++) {
-					ret[i] = new JSONObject(msgs[i]);
-					write("Received msg: \'" + ret[i] + "\'");
-				}
-				return Optional.of((Object[]) ret);
-			} else {
-				// TODO SPRITE
+			String m = Server.getMessage(in);
+			String[] msgs = m.split("\\n");
+			JSONObject[] ret = new JSONObject[msgs.length];
+			for (int i = 0; i < msgs.length; i++) {
+				ret[i] = new JSONObject(msgs[i]);
+				write("Received msg: \'" + ret[i] + "\'");
 			}
+			return Optional.of((Object[]) ret);
 		} catch (IOException e) {
 			if (!Thread.currentThread().isInterrupted()) {
-				e.printStackTrace();
-				System.err.println(e);
 				destroy();
 			}
 		}
@@ -139,9 +162,11 @@ public class Client implements Runnable {
 	}
 	
 	public void sendMsg(String msg) {
+		if (sock.isClosed()) {
+			return;
+		}
 		write("Sending msg: \'" + msg + "\'");
-		out.println(msg);
-		out.flush();
+		Server.sendMsg(out, msg);
 	}
 	
 	public void sendMsg(JSONObject msg) {
@@ -157,16 +182,26 @@ public class Client implements Runnable {
 	@Override
 	public void run() {
 		write("Started RecvThread");
-		while (!interrupted && !Thread.currentThread().isInterrupted()) {
-			Optional<Object[]> ret = waitMsg();
-			if (ret.isPresent()) {
-				Object obj = ret.get();
-				if (obj instanceof JSONObject[]) {
-					parse((JSONObject[]) obj);
-				} else {
-					// SPRITES
+		try {
+			while (!interrupted && !Thread.currentThread().isInterrupted()) {
+				Optional<Object[]> ret = waitMsg();
+				if (ret.isPresent()) {
+					Object obj = ret.get();
+					if (obj instanceof JSONObject[]) {
+						parse((JSONObject[]) obj);
+					} else {
+						// SPRITES
+					}
 				}
 			}
+		} catch (Exception e) {
+			interrupted = true;
+			destroy();
+		}
+		
+		if (game.getStatus() == GameStatus.CONFIG) {
+			game.setStatus(GameStatus.PLACING);
+			game.setErrMsg("Disconnected from the server");
 		}
 	}
 	
@@ -195,12 +230,6 @@ public class Client implements Runnable {
 		throw new RuntimeException(game.getErrMsg());
 	}
 	
-	private void getSprites(JSONObject msg) {
-		HashMap<Integer, String> sprites = Protocol.parseSpritesSendMessage(msg);
-		
-		// TODO download sprites
-	}
-	
 	private void sendIDRequest() {
 		sendMsg(Protocol.getIDRequestMessage());
 	}
@@ -212,6 +241,11 @@ public class Client implements Runnable {
 	private void setTurn(JSONObject msg) {
 		UUID who_turn = Protocol.parseTurnMessage(msg);
 		game.setTurn(who_turn);
+		
+		if (game.getOwnID().equals(who_turn)) {
+			game.flipGenericStatus();
+			// TODO notify GUI
+		}
 	}
 	
 	private void parseBoard(JSONObject msg) {
@@ -219,12 +253,14 @@ public class Client implements Runnable {
 		if (board[0][0] == -1) {
 			game.setErrMsg("Client not available");
 		} else {
-			game.setResource(board);
+			try {
+				ByteArrayOutputStream out = new ByteArrayOutputStream();
+				ObjectOutputStream stream = new ObjectOutputStream(out);
+				stream.writeObject(board);
+				stream.close();
+				game.setResource((Object) out.toByteArray());
+			} catch (IOException e) {}
 		}
-	}
-	
-	private String parseAttackStatus(JSONObject msg) {
-		return Board.statusStrings.get(Protocol.parseAttackStatusMessage(msg));
 	}
 	
 	private void parseGotAttacked(JSONObject msg) {
@@ -240,17 +276,16 @@ public class Client implements Runnable {
 	
 	private void parseMatchEnd(JSONObject msg) {
 		Object[] ret = Protocol.parseMatchEndMessage(msg);
-		
-		Duration d = Duration.ofNanos((Integer) ret[0]);
-		UUID[] ids = (UUID[]) ret[1];
-		String[] names = (String[]) ret[2];
-		Stats[] stats = (Stats[]) ret[3];
+		game.setStatus(GameStatus.END);
+		game.setResource((Object) ret);
+		game.flipGenericStatus();
 		
 		// TODO notify GUI
 	}
 	
 	private void parsePlayerQuit(JSONObject msg) {
 		UUID who = Protocol.parseLeftMessage(msg);
+		game.removePlayer(who);
 		
 		// TODO notify GUI
 	}
@@ -265,6 +300,38 @@ public class Client implements Runnable {
 	
 	private void parseUserNameAccept(JSONObject msg) {
 		game.setOwnID(Protocol.parseUserNameAcceptMessage(msg));
+	}
+	
+	private void handleElimination(JSONObject msg) {
+		UUID id = Protocol.parsePlayerEliminationMessage(msg);
+		game.getPlayer(id).ifPresent(e -> e.setStatus(PlayerStatus.LOSER));
+		
+		// TODO notify GUI
+	}
+	
+	private void handleEliminated(JSONObject msg) {
+		UUID by = Protocol.parseEliminatedMessage(msg);
+		
+		game.getOwnPlayer().setStatus(PlayerStatus.LOSER);
+		
+		// TODO notify GUI
+	}
+	
+	private void getSprites(JSONObject msg) {
+		Map<Integer, String[]> data = Protocol.parseSpritesSendMessage(msg);
+		File folder = new File(Main.CLIENT_SPRITE_PATH);
+		if (!folder.exists()) {
+			folder.mkdir();
+		}
+		
+		data.forEach((i, d) -> {
+			if (d[1].getBytes().length > 0) {
+				try (FileOutputStream out = new FileOutputStream(Main.CLIENT_SPRITE_PATH + "/" + i)) {
+					byte[] dec = Base64.getDecoder().decode(d[1].getBytes());
+					out.write(dec);
+				} catch (Exception e) {}
+			}
+		});
 	}
 	
 	private void parse(JSONObject[] msgs) {
@@ -301,15 +368,20 @@ public class Client implements Runnable {
 						release();
 					case USER_LIST:
 						parseUserList(msg);
+						if (game.availablePermits() <= 0) {
+							release();
+						}
 						break;
 					case ID_SEND:
 						parseIDSend(msg);
 						break;
 					case MATCH_NOT_HOST:
-						game.setErrMsg("not host");
+						game.setResource(new Boolean(false));
+						game.setErrMsg("!host");
 						release();
 						break;
 					case CONFIG_HOST_ACCEPT:
+						game.setResource(new Boolean(true));
 						release();
 						break;
 					case MOD_EXECUTED:
@@ -317,6 +389,7 @@ public class Client implements Runnable {
 						break;
 					case CONFIG:
 						parseGameConfig(msg);
+						release();
 						break;
 					case MOD:
 						parseModMessage(msg);
@@ -327,6 +400,7 @@ public class Client implements Runnable {
 						break;
 					case SPRITES_SEND:
 						getSprites(msg);
+						release();
 						break;
 					case MATCH_START:
 						release();
@@ -336,10 +410,11 @@ public class Client implements Runnable {
 						break;
 					case BOARD:
 						parseBoard(msg);
-						changeStatus("ok");
+						release();
 						break;
 					case ATTACK_STATUS:
-						changeStatus(parseAttackStatus(msg));
+						game.setResource((Object) Protocol.parseAttackStatusMessage(msg));
+						release();
 						break;
 					case GOT_ATTACKED:
 						parseGotAttacked(msg);
@@ -352,6 +427,21 @@ public class Client implements Runnable {
 						break;
 					case CHAT_RECV:
 						handleChat(msg);
+						break;
+					case ELIMINATED:
+						handleEliminated(msg);
+						break;
+					case PLAYER_ELIMINATION:
+						handleElimination(msg);
+						break;
+					case ERROR:
+						game.setErrMsg(Protocol.parseErrorMessage(msg));
+						if (game.getStatus() == GameStatus.CONFIG) {
+							game.setStatus(GameStatus.PLACING);
+						} else {
+							game.setStatus(GameStatus.QUIT);
+							game.flipGenericStatus();
+						}
 						break;
 					default:
 						break;
@@ -368,12 +458,6 @@ public class Client implements Runnable {
 	
 	public void release() {
 		game.release();
-	}
-	
-	private void changeStatus(String str) {
-		/*while (game.getGenericStatus() != GenericStatus.CHANGING);
-		game.setErrMsg(str);
-		game.changeGenericStatus();*/
 	}
 	
 	public void sendConfiguration(GameConfig config) {
@@ -429,7 +513,7 @@ public class Client implements Runnable {
 		sendMsg(Protocol.getChatSendMessage(msg));
 	}
 	
-	private void write(String msg) {
+	public void write(String msg) {
 		Logger.write("[LOCAL CLIENT] " + msg);
 	}
 	

@@ -76,12 +76,23 @@ public class Stats {
 	}
 	
 	public String getPercentageOfHits() {
-		return String.format("%.2f%%", numberOfHits * 100 / numberOfShots);
+		if (numberOfShots > 0) {
+			return String.format("%.2f%%", numberOfHits * 100 / numberOfShots);
+		}
+		return "NaN";
 	}
 	
 	private void computeGrade() {
-		double perc = numberOfHits * 100 / numberOfShots;
-		if (perc >= GRADE_A_TRESHOLD) {
+		double perc;
+		if (numberOfShots > 0) {
+			perc = numberOfHits / numberOfShots;
+		} else {
+			perc = -1;
+		}
+	
+		if (perc < 0) {
+			grade = PlayerGrade.NAN;
+		} else if (perc >= GRADE_A_TRESHOLD) {
 			grade = PlayerGrade.A;
 		} else if (perc >= GRADE_B_TRESHOLD) {
 			grade = PlayerGrade.B;

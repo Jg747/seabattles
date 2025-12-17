@@ -1,7 +1,8 @@
 package org.seabattles.net;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -18,9 +19,8 @@ public class ClientWorker implements Runnable {
 	private class ClientObj {
 	
 		private Socket sock;
-		private InputStream in;
+		private BufferedReader in;
 		private PrintWriter out;
-		private byte[] buffer;
 		
 		private UUID id;
 		
@@ -28,15 +28,13 @@ public class ClientWorker implements Runnable {
 			this.sock = sock;
 			
 			try {
-				in = sock.getInputStream();
+				in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
 				out = new PrintWriter(sock.getOutputStream());
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.err.println(e);
 				destroy();
 			}
-			
-			buffer = new byte[Server.BUF_SIZE];
 		}
 		
 		public void setID(UUID id) {
@@ -45,30 +43,26 @@ public class ClientWorker implements Runnable {
 		
 		public Optional<JSONObject[]> waitMsg() {
 			try {
-				int len = in.read(buffer);
-				if ((len > 2 && buffer[0] == '{' && buffer[1] == '\"') || len == 2 && buffer[0] == '{' && buffer[1] == '}') {
-					String[] msgs = new String(buffer, 0, len).split("\\n");
-					JSONObject[] ret = new JSONObject[msgs.length];
-					for (int i = 0; i < msgs.length; i++) {
-						ret[i] = new JSONObject(msgs[i]);
-						write("Received msg: \'" + ret[i] + "\'");
-					}
-					return Optional.of(ret);
-				} else {
-					// TODO SPRITE
+				String m = Server.getMessage(in);
+				String[] msgs = m.split("\\n");
+				JSONObject[] ret = new JSONObject[msgs.length];
+				for (int i = 0; i < msgs.length; i++) {
+					ret[i] = new JSONObject(msgs[i]);
+					write("Received msg: \'" + ret[i] + "\'");
 				}
+				return Optional.of(ret);
 			} catch (IOException e) {
-				e.printStackTrace();
-				System.err.println(e);
-				destroy();
+				if (!e.getMessage().contains("Socket closed") && !e.getMessage().contains("Connection reset")) {
+					e.printStackTrace();
+				}
+				serv.handleQuit(id);
 			}
 			return Optional.empty();
 		}
 		
 		public void sendMsg(String msg) {
 			write("Sending msg: \'" + msg + "\'");
-			out.println(msg);
-			out.flush();
+			Server.sendMsg(out, msg);
 		}
 		
 		@SuppressWarnings("unused")
@@ -78,6 +72,7 @@ public class ClientWorker implements Runnable {
 		
 		public void destroy() {
 			try {
+				interrupted = true;
 				sock.close();
 				in.close();
 				out.close();
@@ -119,11 +114,18 @@ public class ClientWorker implements Runnable {
 	@Override
 	public void run() {
 		write("Started worker for IP " + client.getSocket());
-		while (!interrupted && !Thread.currentThread().isInterrupted()) {
-			Optional<JSONObject[]> ret = client.waitMsg();
-			if (ret.isPresent()) {
-				serv.parse(client.getID(), ret.get());
+		try {
+			while (!interrupted && !Thread.currentThread().isInterrupted()) {
+				Optional<JSONObject[]> ret = client.waitMsg();
+				if (ret.isPresent()) {
+					serv.parse(client.getID(), ret.get());
+				} else {
+					interrupted = true;
+				}
 			}
+		} catch (Exception e) {
+			serv.sendError(this);
+			serv.handleQuit(client.getID());
 		}
 	}
 	
@@ -149,7 +151,7 @@ public class ClientWorker implements Runnable {
 		}
 	}
 
-	private void write(String msg) {
+	public void write(String msg) {
 		if (client.getID() != null) {
 			Logger.write("[SERVER <-> \'" + shortID() + "\' | " + client.getSocket().getInetAddress() + "] " + msg);
 		} else {

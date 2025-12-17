@@ -32,9 +32,12 @@ public class Bot extends Player {
 			do {
 				try {
 					s.unplace();
-					int rndRot = rndGen.nextInt(4);
+					/*int rndRot = rndGen.nextInt(4);
 					int rndX = rndGen.nextInt(Board.getWidth());
-					int rndY = rndGen.nextInt(Board.getHeigth());
+					int rndY = rndGen.nextInt(Board.getHeigth());*/
+					int rndRot = 0; // TODO
+					int rndX = 0;
+					int rndY = 0;
 					s.rotate(rndRot);
 					s.setX(rndX);
 					s.setY(rndY);

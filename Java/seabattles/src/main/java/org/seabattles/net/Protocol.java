@@ -13,8 +13,8 @@ import org.json.JSONObject;
 import org.seabattles.src.Board;
 import org.seabattles.src.Board.AttackStatus;
 import org.seabattles.src.GameConfig;
-import org.seabattles.src.Logger;
 import org.seabattles.src.GameConfig.GameDifficulty;
+import org.seabattles.src.Main;
 import org.seabattles.src.Player.PlayerGrade;
 import org.seabattles.src.Ship;
 import org.seabattles.src.ShipConfig;
@@ -62,6 +62,7 @@ public abstract class Protocol {
 		GOT_ATTACKED,
 		
 		ELIMINATED,
+		PLAYER_ELIMINATION,
 		
 		QUIT,
 		LEFT,
@@ -111,7 +112,9 @@ public abstract class Protocol {
 		SUNK,
 		ELIMINATIONS,
 		GRADE,
-		BY
+		WINNER,
+		BY,
+		DATA
 	};
 	
 	private static final Map<MsgString, String> strings = Map.ofEntries(
@@ -152,7 +155,9 @@ public abstract class Protocol {
 		Map.entry(MsgString.SUNK, "sunk"),
 		Map.entry(MsgString.ELIMINATIONS, "eliminations"),
 		Map.entry(MsgString.GRADE, "grade"),
-		Map.entry(MsgString.BY, "by")
+		Map.entry(MsgString.WINNER, "winner"),
+		Map.entry(MsgString.BY, "by"),
+		Map.entry(MsgString.DATA, "data")
 	);
 	
 	private static final Map<MsgType, String> types = Map.ofEntries(
@@ -185,6 +190,7 @@ public abstract class Protocol {
 			Map.entry(MsgType.ATTACK_STATUS, "attack_status"),
 			Map.entry(MsgType.GOT_ATTACKED, "got_attacked"),
 			Map.entry(MsgType.ELIMINATED, "eliminated"),
+			Map.entry(MsgType.PLAYER_ELIMINATION, "player_elimination"),
 			Map.entry(MsgType.QUIT, "quit"),
 			Map.entry(MsgType.LEFT, "left"),
 			Map.entry(MsgType.CHAT_SEND, "chat_send"),
@@ -333,7 +339,7 @@ public abstract class Protocol {
 		for (int i = 0; i < shipsArr.length(); i++) {
 			ships[i] = new ShipConfig(shipsArr.getJSONObject(i));
 			if (!ships[i].getSpritePath().equals(NULL)) {
-				ships[i].setSprite(Server.SPRITE_PATH + "/" + ships[i].getSpritePath());
+				ships[i].setSprite(Main.SERVER_SPRITE_PATH + "/" + i);
 			}
 		}
 		ret.setShipsConfigArray(ships);
@@ -469,7 +475,7 @@ public abstract class Protocol {
 		return Optional.of(ret);
 	}
 	
-	public static JSONObject getSpritesSendMessage(HashMap<Integer, String> sprites) {
+	public static JSONObject getSpritesSendMessage(Map<Integer, String[]> sprites) {
 		JSONObject ret = new JSONObject();
 		ret.put(strings.get(MsgString.TYPE), types.get(MsgType.SPRITES_SEND));
 		
@@ -477,7 +483,8 @@ public abstract class Protocol {
 		for (Integer key : sprites.keySet()) {
 			JSONObject obj = new JSONObject();
 			obj.put(strings.get(MsgString.ID), key);
-			obj.put(strings.get(MsgString.NAME), (String) sprites.get(key));
+			obj.put(strings.get(MsgString.NAME), (String) sprites.get(key)[0]);
+			obj.put(strings.get(MsgString.DATA), (String) sprites.get(key)[1]);
 			
 			arr.put(obj);
 		}
@@ -487,11 +494,14 @@ public abstract class Protocol {
 		return ret;
 	}
 	
-	public static HashMap<Integer, String> parseSpritesSendMessage(JSONObject msg) {
-		HashMap<Integer, String> ret = new HashMap<>();
+	public static Map<Integer, String[]> parseSpritesSendMessage(JSONObject msg) {
+		Map<Integer, String[]> ret = new HashMap<>();
 		JSONArray arr = msg.getJSONArray(strings.get(MsgString.SPRITES));
 		for (Object o : arr) {
-			ret.put(((JSONObject) o).getInt(strings.get(MsgString.ID)), ((JSONObject) o).getString(strings.get(MsgString.NAME)));
+			String[] data = new String[2];
+			data[0] = ((JSONObject) o).getString(strings.get(MsgString.NAME));
+			data[1] = ((JSONObject) o).getString(strings.get(MsgString.DATA));
+			ret.put(((JSONObject) o).getInt(strings.get(MsgString.ID)), data);
 		}
 		return ret;
 	}
@@ -569,6 +579,11 @@ public abstract class Protocol {
 		JSONObject ret = new JSONObject();
 		ret.put(strings.get(MsgString.TYPE), types.get(MsgType.BOARD));
 		
+		if (board == null) {
+			ret.put(strings.get(MsgString.BOARD), new JSONArray());
+			return ret;
+		}
+		
 		int[] arr = new int[board.length * board[0].length];
 		int index = 0;
 		for (int i = 0; i < board.length; i++) {
@@ -594,7 +609,7 @@ public abstract class Protocol {
 		
 		int i = 0, j = 0;
 		for (Object o : arr) {
-			ret[i][j] = (Byte) o;
+			ret[i][j] = ((Integer) o).byteValue();
 			j = (j + 1) % Board.getWidth();
 			if (j == 0) {
 				i++;
@@ -680,11 +695,11 @@ public abstract class Protocol {
 		Object[] ret = new Object[2];
 		
 		JSONArray arr = msg.getJSONArray(strings.get(MsgString.NEW_BOARD));
-		Byte[][] board = new Byte[Board.getHeigth()][Board.getWidth()];
+		byte[][] board = new byte[Board.getHeigth()][Board.getWidth()];
 		
 		int i = 0, j = 0;
 		for (Object o : arr) {
-			board[i][j] = (Byte) o;
+			board[i][j] = ((Integer) o).byteValue();
 			j = (j + 1) % Board.getWidth();
 			if (j == 0) {
 				i++;
@@ -697,14 +712,15 @@ public abstract class Protocol {
 		return ret;
 	}
 	
-	public static Optional<JSONObject> getMatchEndMessage(Duration d, UUID[] ids, String[] names, Stats[] stats) {
+	public static Optional<JSONObject> getMatchEndMessage(Duration d, UUID winner, UUID[] ids, String[] names, Stats[] stats) {
 		if (!(ids.length == names.length && names.length == stats.length)) {
 			return Optional.empty();
 		}
 		
 		JSONObject ret = new JSONObject();
 		ret.put(strings.get(MsgString.TYPE), types.get(MsgType.MATCH_END));
-		ret.put(strings.get(MsgString.DURATION), d.getNano());
+		ret.put(strings.get(MsgString.WINNER), winner.toString());
+		ret.put(strings.get(MsgString.DURATION), d.getSeconds());
 		
 		JSONArray players = new JSONArray();
 		for (int i = 0; i < ids.length; i++) {
@@ -724,24 +740,26 @@ public abstract class Protocol {
 			
 			players.put(player);
 		}
+		ret.put(strings.get(MsgString.PLAYERS), players);
 		
 		return Optional.of(ret);
 	}
 	
 	public static Object[] parseMatchEndMessage(JSONObject msg) {
-		Object[] ret = new Object[4];
+		Object[] ret = new Object[5];
 		JSONArray arr = msg.getJSONArray(strings.get(MsgString.PLAYERS));
 		
-		ret[0] = (Integer) msg.getInt(strings.get(MsgString.DURATION));
-		ret[1] = new UUID[arr.length()];
-		ret[2] = new String[arr.length()];
-		ret[3] = new Stats[arr.length()];
+		ret[0] = (Long) msg.getLong(strings.get(MsgString.DURATION));
+		ret[1] = UUID.fromString(msg.getString(strings.get(MsgString.WINNER)));
+		ret[2] = new UUID[arr.length()];
+		ret[3] = new String[arr.length()];
+		ret[4] = new Stats[arr.length()];
 		
 		int index = 0;
 		for (Object o : arr) {
 			JSONObject obj = (JSONObject) o;
-			((UUID[]) ret[1])[index] = UUID.fromString(obj.getString(strings.get(MsgString.ID)));
-			((String[]) ret[2])[index] = obj.getString(strings.get(MsgString.NAME));
+			((UUID[]) ret[2])[index] = UUID.fromString(obj.getString(strings.get(MsgString.ID)));
+			((String[]) ret[3])[index] = obj.getString(strings.get(MsgString.NAME));
 			
 			JSONObject stat_obj = obj.getJSONObject(strings.get(MsgString.STATS));
 			Stats stat = new Stats();
@@ -750,7 +768,7 @@ public abstract class Protocol {
 			stat.setNumberOfSunkShips((short) stat_obj.getInt(strings.get(MsgString.SUNK)));
 			stat.setNumberOfPlayerEliminations((short) stat_obj.getInt(strings.get(MsgString.ELIMINATIONS)));
 			stat.setGrade(Enum.valueOf(PlayerGrade.class, stat_obj.getString(strings.get(MsgString.GRADE))));
-			((Stats[]) ret[3])[index] = stat;
+			((Stats[]) ret[4])[index] = stat;
 			
 			index++;
 		}
@@ -767,6 +785,17 @@ public abstract class Protocol {
 	
 	public static UUID parseEliminatedMessage(JSONObject msg) {
 		return UUID.fromString(msg.getString(strings.get(MsgString.BY)));
+	}
+	
+	public static JSONObject getPlayerEliminationMessage(UUID id) {
+		JSONObject ret = new JSONObject();
+		ret.put(strings.get(MsgString.TYPE), types.get(MsgType.PLAYER_ELIMINATION));
+		ret.put(strings.get(MsgString.ID), id.toString());
+		return ret;
+	}
+	
+	public static UUID parsePlayerEliminationMessage(JSONObject msg) {
+		return UUID.fromString(msg.getString(strings.get(MsgString.ID)));
 	}
 	
 	public static JSONObject getQuitMessage() {

@@ -12,6 +12,8 @@ public class Logger {
 	}
 	
 	public static void write(String msg) {
-		gui.threadWriteDebug(msg);
+		if (Main.DEBUG_MODE) {
+			gui.threadWriteDebug(msg);
+		}
 	}
 }

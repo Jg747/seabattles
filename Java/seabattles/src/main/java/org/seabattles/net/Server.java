@@ -1,14 +1,20 @@
 package org.seabattles.net;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -25,7 +31,11 @@ import org.seabattles.src.Game;
 import org.seabattles.src.Game.GameStatus;
 import org.seabattles.src.GameConfig;
 import org.seabattles.src.Logger;
+import org.seabattles.src.Main;
 import org.seabattles.src.Player;
+import org.seabattles.src.Player.PlayerGrade;
+import org.seabattles.src.Player.PlayerStatus;
+import org.seabattles.src.ShipConfig;
 import org.seabattles.src.Stats;
 
 public class Server implements Runnable {
@@ -38,8 +48,7 @@ public class Server implements Runnable {
 	};
 
 	public static final int SERVER_PORT = 42069;
-	public static final String SPRITE_PATH = "tmp_sprites";
-	public static final int BUF_SIZE = 4096;
+	public static final int BUF_SIZE = 64;
 	
 	private static final byte MAX_CLIENTS = Game.MAX_PLAYERS;
 	
@@ -53,6 +62,15 @@ public class Server implements Runnable {
 	
 	private File spritesFolder;
 	
+	public static String getMessage(BufferedReader in) throws IOException {
+		return in.readLine();
+	}
+	
+	public static void sendMsg(PrintWriter out, String msg) {
+		out.println(msg);
+		out.flush();
+	}
+	
 	public Server(Game game) throws IOException {
 		socket = new ServerSocket(SERVER_PORT);
 		
@@ -63,7 +81,7 @@ public class Server implements Runnable {
 		banList = new ArrayList<>();
 		host = null;
 		
-		spritesFolder = new File(SPRITE_PATH);
+		spritesFolder = new File(Main.SERVER_SPRITE_PATH);
 		if (!spritesFolder.exists()) {
 			spritesFolder.mkdir();
 		}
@@ -76,11 +94,16 @@ public class Server implements Runnable {
 	}
 	
 	public void destroy() {
+		if (stop) {
+			return;
+		}
+		
+		game.setStatus(GameStatus.QUIT);
 		stop = true;
 		
 		try {
 			for (ClientWorker c : clients.values()) {
-				c.stop();
+				c.sendMsg(Protocol.getErrorMessage("Server closed"));
 				c.destroy();
 			}
 			threadsPool.shutdown();
@@ -102,6 +125,8 @@ public class Server implements Runnable {
 			e.printStackTrace();
 			System.err.println(e.getMessage());
 		}
+		
+		write("Server destroyed");
 	}
 
 	private boolean isBanned(Socket sock) {
@@ -111,6 +136,10 @@ public class Server implements Runnable {
 	private void sendBanMessage(Socket sock) throws IOException {
 		PrintWriter out = new PrintWriter(sock.getOutputStream());
 		out.println(Protocol.getConnectionMessage(MsgType.CONN_ERR, "You're currently banned from this game").get().toString());
+	}
+	
+	public ClientWorker getWorker(UUID id) {
+		return clients.get(id);
 	}
 	
 	@Override
@@ -154,19 +183,23 @@ public class Server implements Runnable {
 		client.destroy();
 	}
 	
+	private void handleDisconnect(UUID id) {
+		handleDisconnect(clients.get(id));
+		clients.remove(id);
+	}
+	
 	private boolean sendConnStatus(ClientWorker client) {
 		
 		JSONObject msg;
-		int nPlayers = game.getNumberOfPlayers();
-		if (clients.size() > nPlayers) {
-			msg = Protocol.getConnectionMessage(MsgType.CONN_FULL, null).orElse(new JSONObject());
+		if (game.getStatus() != Game.GameStatus.CONFIG) {
+			msg = Protocol.getConnectionMessage(MsgType.CONN_MATCH_STARTED, null).orElse(new JSONObject());
 			client.sendMsg(msg);
 			handleDisconnect(client);
 			return false;
 		}
 		
-		if (game.getStatus() != Game.GameStatus.CONFIG) {
-			msg = Protocol.getConnectionMessage(MsgType.CONN_MATCH_STARTED, null).orElse(new JSONObject());
+		if (clients.size() >= game.getNumberOfPlayers()) {
+			msg = Protocol.getConnectionMessage(MsgType.CONN_FULL, null).orElse(new JSONObject());
 			client.sendMsg(msg);
 			handleDisconnect(client);
 			return false;
@@ -242,19 +275,48 @@ public class Server implements Runnable {
 		if (id == host) {
 			Object[] mod = Protocol.parseModMessage(msg);
 			if (((UUID) mod[0]).equals(host)) {
+				sendModExecuted(id);
 				return;
 			}
 			
 			if (!game.doesExist((UUID) mod[0])) {
 				clients.get(id).sendMsg(Protocol.getErrorMessage("Invalid player ID"));
+				sendModExecuted(id);
 				return;
 			}
 			
 			if ((Boolean) mod[1]) {
 				banList.add(clients.get((UUID) mod[0]).getIP());
 			}
-			handleDisconnect(clients.get((UUID) mod[0]));
+			
+			clients.get((UUID) mod[0]).sendMsg(Protocol.getModMessage((UUID) mod[0], (Boolean) mod[1]));
+			handleDisconnect((UUID) mod[0]);
+			
 			sendModExecuted(id);
+			
+			game.removePlayer((UUID) mod[0]);
+			broadcastPlayerList();
+		} else {
+			sendMatchNotHost(id);
+		}
+	}
+	
+	private void receiveSprites(JSONObject msg) {
+		Map<Integer, String[]> data = Protocol.parseSpritesSendMessage(msg);
+		data.forEach((i, d) -> {
+			if (d[1].getBytes().length > 0) {
+				try (FileOutputStream out = new FileOutputStream(Main.SERVER_SPRITE_PATH + "/" + i)) {
+					byte[] dec = Base64.getDecoder().decode(d[1].getBytes());
+					out.write(dec);
+				} catch (Exception e) {}
+			}
+		});
+	}
+	
+	private void parseSpritesData(UUID id, JSONObject msg) {
+		if (id == host) {
+			receiveSprites(msg);			
+			sendHostAccept(id);
 		} else {
 			sendMatchNotHost(id);
 		}
@@ -269,13 +331,29 @@ public class Server implements Runnable {
 	}
 	
 	private void broadcastSprites() {
-		HashMap<Integer, String> sprites = new HashMap<>();
-		
-		// TODO get sprites data
-		
-		broadcast(Protocol.getSpritesSendMessage(sprites));
-		
-		// TODO send sprites
+		try {
+			Map<Integer, String[]> toSend = new HashMap<>();
+			for (ShipConfig s : game.getGameConfig().getShipsConfig()) {
+				String[] data = new String[2];
+				data[0] = String.valueOf(s.getID());
+				if (new File(Main.SERVER_SPRITE_PATH + "/" + data[0]).exists()) {
+					data[1] = new String(Base64.getEncoder().encode(Files.readAllBytes(Paths.get(Main.SERVER_SPRITE_PATH + "/" + data[0]))), "UTF-8");
+				} else {
+					data[1] = "";
+				}
+				toSend.put(s.getID(), data);
+			}
+			
+			broadcast(Protocol.getSpritesSendMessage(toSend));
+		} catch (Exception e) {}
+	}
+	
+	private void writePlayerList() {
+		StringBuilder list = new StringBuilder("----- Player list -----\n");
+		for (UUID id : game.getPlayers()) {
+			list.append(id).append(id.equals(host) ? " - host" : ((game.getPlayer(id).get() instanceof Bot) ? " - bot" : "")).append("\n");
+		}
+		write(list.toString());
 	}
 	
 	private void parseMatchPlcmStart(UUID id) {
@@ -287,6 +365,8 @@ public class Server implements Runnable {
 				game.addBots();
 				broadcastPlayerList();
 				broadcastSprites();
+				
+				writePlayerList();
 				
 				// START GAME THREAD
 				game.setServer(this);
@@ -340,13 +420,13 @@ public class Server implements Runnable {
 	private void parseBoardRequest(UUID id, JSONObject msg) {
 		Object[] arr = Protocol.parseBoardRequestMessage(msg);
 		boolean debug = false;
-		if (!((String) arr[1]).equals(Game.DEBUG_STRING)) {
+		if (((String) arr[1]).equals(Game.DEBUG_STRING)) {
 			debug = true;
 		}
 		UUID playerId = (UUID) arr[0];
 		
-		if (!game.doesExist(playerId)) {
-			clients.get(id).sendMsg(Protocol.getErrorMessage("Invalid player ID"));
+		if (!game.doesExist(playerId) || game.getPlayer(playerId).get().isDead()) {
+			clients.get(id).sendMsg(Protocol.getBoardMessage(null)); // Invalid player ID | isDead
 			return;
 		}
 		
@@ -355,22 +435,28 @@ public class Server implements Runnable {
 		sendBoardMessage(id, Protocol.getBoardMessage(board));
 	}
 	
-	private void parseAttackRequest(UUID id, JSONObject msg) {
+	private boolean parseAttackRequest(UUID id, JSONObject msg) {
 		Object[] ret = Protocol.parseAttackMessage(msg);
 		if (((UUID) ret[0]).equals(id) || !game.doesExist((UUID) ret[0])) {
 			clients.get(id).sendMsg(Protocol.getAttackStatusMessage(AttackStatus.ERROR));
+			return false;
+		}
+		
+		if (!id.equals(game.getTurn())) {
+			clients.get(id).sendMsg(Protocol.getAttackStatusMessage(AttackStatus.NOT_TURN));
+			return false;
 		}
 		
 		if (game.getPlayer((UUID) ret[0]).get().isDead()) {
 			clients.get(id).sendMsg(Protocol.getAttackStatusMessage(AttackStatus.DEAD));
+			return false;
 		}
-		
-		clients.get(id).sendMsg(Protocol.getAttackStatusMessage(game.getPlayer(id).get().attack(game.getPlayer((UUID) ret[0]).get(), (Integer) ret[1], (Integer) ret[2])));
-		clients.get((UUID) ret[0]).sendMsg(Protocol.getGotAttackedMessage(id, game.getPlayer((UUID) ret[0]).get().getBoard().getHits()));
+
+		return game.playerAttackServer(clients.get(id), clients.get((UUID) ret[0]), ret);
 	}
 	
 	// GAME GUI
-	public void broadcastMatchEnd(Duration d, Map<UUID, Player> players) {
+	public void broadcastMatchEnd(Duration d, UUID winner, Map<UUID, Player> players) {
 		UUID[] ids = new UUID[players.size()];
 		String[] names = new String[players.size()];
 		Stats[] stats = new Stats[players.size()];
@@ -384,18 +470,35 @@ public class Server implements Runnable {
 			index++;
 		}
 		
-		broadcast(Protocol.getMatchEndMessage(d, ids, names, stats));
+		broadcast(Protocol.getMatchEndMessage(d, winner, ids, names, stats));
 	}
 	
-	private void handleQuit(UUID who) {
-		clients.get(who).destroy();
-		clients.put(who, null);
+	public void handleQuit(UUID who) {
+		if (who.equals(game.getTurn())) {
+			game.release();
+		}
+		
+		game.getPlayer(who).orElse(new Player()).setStatus(PlayerStatus.QUIT);
+		
+		if (!who.equals(host)) {
+			clients.get(who).destroy();
+			clients.remove(who);
+		}
+		
+		if (clients.values().stream().count() == 0) {
+			this.destroy();
+			return;
+		}
 		
 		broadcast(Protocol.getLeftMessage(who));
 	}
 	
 	private void parseChatMessage(UUID id, JSONObject msg) {
 		broadcast(Protocol.getChatRecvMessage(id, Protocol.parseChatSendMessage(msg)));
+	}
+	
+	public void broadcastPlayerElimination(UUID id) {
+		broadcast(Protocol.getPlayerEliminationMessage(id));
 	}
 	
 	public void parse(UUID id, JSONObject[] msgs) {
@@ -422,7 +525,11 @@ public class Server implements Runnable {
 						parseBoardRequest(id, msg);
 						break;
 					case ATTACK:
-						parseAttackRequest(id, msg);
+						if (parseAttackRequest(id, msg)) {
+							if (game.getAttacked().containsAll(game.getAvailablePlayers())) {
+								game.release();
+							}
+						}
 						break;
 					case QUIT:
 						handleQuit(id);
@@ -430,18 +537,24 @@ public class Server implements Runnable {
 					case CHAT_SEND:
 						parseChatMessage(id, msg);
 						break;
+					case SPRITES_SEND:
+						parseSpritesData(id, msg);
+						break;
 					default:
 						break;
 				}
 			} catch (Exception e) {
-				e.printStackTrace();
 				clients.get(id).sendMsg(Protocol.getErrorMessage("An unexpected error occurred while parsing the message"));
 			}
 		}
 	}
 	
-	private void write(String msg) {
+	public void write(String msg) {
 		Logger.write("[SERVER] " + msg);
+	}
+	
+	public void sendError(ClientWorker w) {
+		w.sendMsg(Protocol.getErrorMessage("An unexpected error occurred, you got disconnected"));
 	}
 
 }

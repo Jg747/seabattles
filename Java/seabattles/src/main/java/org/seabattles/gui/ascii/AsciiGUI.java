@@ -1,7 +1,10 @@
 package org.seabattles.gui.ascii;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -15,11 +18,12 @@ import java.util.UUID;
 import java.util.concurrent.Semaphore;
 
 import org.seabattles.interfaces.GUI;
+import org.seabattles.net.Client;
 import org.seabattles.src.Board;
 import org.seabattles.src.Game;
 import org.seabattles.src.Game.GameStatus;
+import org.seabattles.src.Game.GenericStatus;
 import org.seabattles.src.GameConfig;
-import org.seabattles.src.Logger;
 import org.seabattles.src.GameConfig.GameDifficulty;
 import org.seabattles.src.Main;
 import org.seabattles.src.Player;
@@ -121,7 +125,7 @@ public class AsciiGUI implements GUI {
 	}
 	
 	private void showBoard(Board b, boolean own) {
-		byte[][] hits = !own && !Game.DEBUG_MODE ? b.getObfuscatedHits() : b.getHits();
+		byte[][] hits = !own && !Main.DEBUG_MODE ? b.getObfuscatedHits() : b.getHits();
 		
 		print("\t");
 		for (int i = 0; i < hits.length; i++) {
@@ -276,7 +280,8 @@ public class AsciiGUI implements GUI {
 			default:
 				break;
 		}
-		println("Finish time: " + duration.toMinutes() + "m " + duration.toSeconds() + "s");
+		long time = Math.abs(duration.getSeconds());
+		println(String.format("Finish time: %dm %ds", time / 60, time % 60));
 		
 		// Object[0] = String userName, Object[1] = Stats playerStats
 		
@@ -287,20 +292,8 @@ public class AsciiGUI implements GUI {
 	@Override
 	public int getMode() {
 		printTitle();
-		
-		String choice;
-		int value;
-		
-		do {
-			value = -1;
-			print("Selezionare la modalità di gioco (0 = offline, 1 = crea un match, 2 = partecipa ad un match): ");
-			choice = scan.nextLine();
-			try {
-				value = Integer.parseInt(choice);
-			} catch (NumberFormatException e) {}
-		} while (value < 0 || value > 2);
-		
-		return value;
+		println("1. Singleplayer\n2. Multiplayer\n3. Exit\n");
+		return numberChoice("Choice: ", 1, 3);
 	}
 	
 	@Override
@@ -415,23 +408,61 @@ public class AsciiGUI implements GUI {
 	}
 
 	@Override
-	public GuiAction getAction() {
+	public GuiAction getAction(boolean isMultiplayer, boolean waiting) {
 		showPlayerField();
 		
-		println("1. Show field\n2. Attack\n3. Leave");
-		int choice = numberChoice("What do you want to do? ", 1, 3);
-		
-		switch (choice) {
-			case 1:
-				return GuiAction.SHOW_FIELD;
-			case 2:
-				return GuiAction.ATTACK;
-			case 3:
-				if (boolQuestion("Are you sure you want to leave? ")) {
-					return GuiAction.QUIT;
+		if (!isMultiplayer) {
+			println("1. Show field\n2. Attack\n3. Leave");
+			int choice = numberChoice("What do you want to do? ", 1, 3);
+			
+			switch (choice) {
+				case 1:
+					return GuiAction.SHOW_FIELD;
+				case 2:
+					return GuiAction.ATTACK;
+				case 3:
+					if (boolQuestion("Are you sure you want to leave? ")) {
+						return GuiAction.QUIT;
+					}
+				default:
+					return GuiAction.NONE;
+			}
+		} else {
+			if (waiting) {
+				println("1. Show field\n2. Chat\n3. Leave\n4. Refresh");
+				int choice = numberChoice("What do you want to do? ", 1, 4);
+				
+				switch (choice) {
+					case 1:
+						return GuiAction.SHOW_FIELD;
+					case 2:
+						return GuiAction.CHAT;
+					case 3:
+						if (boolQuestion("Are you sure you want to leave? ")) {
+							return GuiAction.QUIT;
+						}
+					default:
+						return GuiAction.NONE;
 				}
-			default:
-				return GuiAction.NONE;
+			} else {
+				println("1. Show field\n2. Attack\n3. Chat\n4. Leave\n5. Refresh");
+				int choice = numberChoice("What do you want to do? ", 1, 5);
+				
+				switch (choice) {
+					case 1:
+						return GuiAction.SHOW_FIELD;
+					case 2:
+						return GuiAction.ATTACK;
+					case 3:
+						return GuiAction.CHAT;
+					case 4:
+						if (boolQuestion("Are you sure you want to leave? ")) {
+							return GuiAction.QUIT;
+						}
+					default:
+						return GuiAction.NONE;
+				}
+			}
 		}
 	}
 	
@@ -452,9 +483,7 @@ public class AsciiGUI implements GUI {
 	}
 	
 	@Override
-	public Optional<Player> getWhoPlayer(String msg, Map<UUID, Player> players, Set<UUID> ignore) {
-		//showPlayerField();
-		
+	public Optional<Player> getWhoPlayer(String msg, Map<UUID, Player> players, Set<UUID> ignore) {		
 		Set<UUID> temp = new HashSet<>(players.keySet());
 		temp.removeAll(ignore);
 		
@@ -509,7 +538,15 @@ public class AsciiGUI implements GUI {
 		println("1. Host match\n2. Connect to match");
 		int choice = numberChoice("Choice: ", 1, 2);
 		
-		print("Username: ");
+		if (choice == 1) {
+			ret[0] = "HOST";
+			ret[1] = null;
+		} else {
+			ret[0] = "NOT_HOST";
+			ret[1] = "127.0.0.1";
+		}
+		// TODO
+		/*print("Username: ");
 		String name = scan.nextLine();
 		name = name.trim().strip();
 		if (name.contains(" ")) {
@@ -528,11 +565,11 @@ public class AsciiGUI implements GUI {
 				if (ip.contains(" ")) {
 					ip = ip.substring(0, ip.indexOf(' '));
 				}
-				ret[2] = ip;
+				ret[1] = ip;
 				break;
 			default:
 				break;
-		}
+		}*/
 		
 		return ret;
 	}
@@ -576,17 +613,15 @@ public class AsciiGUI implements GUI {
 				printTitle();
 				printPlayerList();
 				println("\n1. Refresh");
-				println("2. Kick player");
-				println("3. Ban player");
 				if (hide == 0) {
+					println("2. Kick player");
+					println("3. Ban player");
 					println("4. Start game");
 				}
-				int choice = numberChoice("Choice (-1 go back): ", -1, 4 - hide);
+				int choice = numberChoice("Choice (-1 quit): ", -1, 4 - (hide * 3));
 				switch (choice) {
 					case -1:
 						return false;
-					case 1:
-						break;
 					case 2:
 						executeMod(false);
 						break;
@@ -598,6 +633,7 @@ public class AsciiGUI implements GUI {
 							hide++;
 							game.getClient().sendStart();
 							game.getClient().acquire();
+							game.setResource(null);
 						}
 						break;
 					default:
@@ -606,18 +642,16 @@ public class AsciiGUI implements GUI {
 			} while (game.getStatus() != GameStatus.PLACING);
 		} else {
 			while (game.getStatus() != GameStatus.PLACING) {
-				try {
-					printTitle();
-					printPlayerList();
+				printTitle();
+				printPlayerList();
 					
-					println("\nWaiting game start");
+				println("\nWaiting game start");
 					
-					if (boolQuestion("0 refresh, 1 quit: ")) {
-						return false;
-					}
-					
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {}
+				println("1. Refresh\n2. Quit\n\n");
+				int choice = numberChoice("Choice: ", 1, 2);
+				if (choice == 2) {
+					return false;
+				}
 			}
 		}
 		return true;
@@ -627,5 +661,12 @@ public class AsciiGUI implements GUI {
 	public void waitGameStart() {
 		showPlayerField();
 		game.getClient().acquire();
+	}
+	
+	@Override
+	public String sendChat() {
+		print("chat send: ");
+		String msg = scan.nextLine();
+		return msg;
 	}
 }

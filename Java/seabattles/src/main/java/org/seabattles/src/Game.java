@@ -1,8 +1,10 @@
 package org.seabattles.src;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +23,8 @@ import org.json.JSONException;
 import org.seabattles.interfaces.GUI;
 import org.seabattles.interfaces.GUI.GuiAction;
 import org.seabattles.net.Client;
+import org.seabattles.net.ClientWorker;
+import org.seabattles.net.Protocol;
 import org.seabattles.net.Server;
 import org.seabattles.net.Server.ConnStatus;
 import org.seabattles.src.Board.AttackStatus;
@@ -33,7 +37,8 @@ public class Game implements Runnable {
 		CONFIG,						// Game not started yet
 		PLACING,					// placing ships
 		RUNNING,					// players playing
-		END							// winner chosen
+		END,						// winner chosen
+		QUIT						// Player has quit
 	};
 	
 	public enum GenericStatus {
@@ -44,7 +49,7 @@ public class Game implements Runnable {
 	
 	private Thread serverThread;
 	private Server server;
-	private Semaphore sem;
+	public Semaphore sem;//
 	
 	private Thread recvThread;
 	private Client client;
@@ -56,7 +61,6 @@ public class Game implements Runnable {
 	
 	public static final int MAX_PLAYERS = 4;
 	public static final String DEBUG_STRING = "debug_string";
-	public static boolean DEBUG_MODE = true;
 	private static final String DEFAULT_USERNAME = "You";
 	
 	private UUID ownID;
@@ -68,6 +72,11 @@ public class Game implements Runnable {
 	private GenericStatus genericStatus;
 	private String errMsg;
 	private Object resource;
+	
+	private Set<UUID> attacked;
+	private Set<UUID> availablePlayers;
+	
+	private String debugString;
 	
  	public Game() {
 		config = new GameConfig();
@@ -83,7 +92,16 @@ public class Game implements Runnable {
 		players = new LinkedHashMap<>();
 		
 		sem = new Semaphore(0);
+		debugString = DEBUG_STRING; // TODO debugString = null;
 	}
+ 	
+ 	public void setDebugString(String dbg) {
+ 		debugString = dbg;
+ 	}
+ 	
+ 	public String getDebugString() {
+ 		return debugString;
+ 	}
  	
  	public boolean isServer() {
  		return server != null || serverThread != null;
@@ -107,28 +125,31 @@ public class Game implements Runnable {
  	
  	public void setTurn(UUID id) {
  		turn = id;
- 		// TODO notify GUI that turn changed
+ 	}
+ 	
+ 	public UUID getTurn() {
+ 		return turn;
+ 	}
+ 	
+ 	public Set<UUID> getAttacked() {
+ 		return attacked;
+ 	}
+ 	
+ 	public Set<UUID> getAvailablePlayers() {
+ 		return availablePlayers;
  	}
  	
  	// GUI INTERFACE
- 	public void waitStatusChange() {
- 		genericStatus = GenericStatus.CHANGING;
- 		while (genericStatus == GenericStatus.WAITING_MSG) {
- 			try {
- 				Thread.sleep(500);
- 			} catch (InterruptedException e) {
- 				genericStatus = GenericStatus.UNDEFINED;
- 				break;
- 			}
+ 	public void flipGenericStatus() {
+ 		if (genericStatus == GenericStatus.WAITING_MSG) {
+ 			genericStatus = GenericStatus.UNDEFINED;
+ 		} else {
+ 			genericStatus = GenericStatus.WAITING_MSG;
  		}
  	}
  	
  	public GenericStatus getGenericStatus() {
  		return genericStatus;
- 	}
- 	
- 	public void changeGenericStatus() {
- 		genericStatus = GenericStatus.UNDEFINED;
  	}
  	
  	public void setErrMsg(String msg) {
@@ -240,6 +261,10 @@ public class Game implements Runnable {
 		}
 	}
 	
+	public void removePlayer(UUID id) {
+		players.remove(id);
+	}
+	
 	// GUI INTERFACE
 	public Optional<Player> getPlayer(UUID id) {
 		return Optional.ofNullable(players.get(id));
@@ -263,20 +288,24 @@ public class Game implements Runnable {
 		return config;
 	}
 	
-	private void createPlayersFromConfig() {
+	private void createPlayersFromConfig(boolean bots) {
 		if (players.size() == 0) {
-			System.err.println("QUI");
 			for (int i = 0; i < config.getNumberOfPlayers(); i++) {
 				addPlayer();
 			}
 		}
 		
+		if (bots) {
+			addBots();
+		}
+		generateBoards();
+	}
+	
+	private void generateBoards() {
 		for (Player p : players.values()) {
 			p.setConfig(config);
 			p.generateBoard();
 		}
-		
-		addBots();
 	}
 	
 	private boolean checkIfWinner() {
@@ -303,9 +332,11 @@ public class Game implements Runnable {
 		return getPlayersPred(e -> e.getValue().isDead() || e.getKey().equals(ownID));
 	}
 	
-	private void playerAttack(Set<UUID> attacked) {
+	private void playerAttack() {
 		Set<UUID> ignored = getPlayersToIgnore();
 		ignored.addAll(attacked);
+		
+		gui.showPlayerField();
 		Optional<Player> who = gui.getWhoPlayer("Who do you want to attack? ", players, ignored);
 		
 		do {
@@ -377,20 +408,21 @@ public class Game implements Runnable {
 			return;
 		}
 		
-		Set<UUID> attacked = new HashSet<>();
-		Set<UUID> availablePlayers = getPlayersToNotIgnore();
+		attacked = new HashSet<>();
+		availablePlayers = getPlayersToNotIgnore();
 		
 		while (status == GameStatus.RUNNING) {
-			GuiAction act = gui.getAction();
+			GuiAction act = gui.getAction(false, false);
 			switch (act) {
 				case SHOW_FIELD:
+					gui.showPlayerField();
 					Optional<Player> who = gui.getWhoPlayer("Who do you want to see (-1 go back)? ", players, getPlayersToIgnore());
 					if (who.isPresent()) {
 						gui.showField(who.get(), true);
 					}
 					break;
 				case ATTACK:
-					playerAttack(attacked);
+					playerAttack();
 					if (attacked.containsAll(availablePlayers)) {
 						return;
 					}
@@ -417,7 +449,7 @@ public class Game implements Runnable {
 	
 	private void gameStart() throws Exception {
 		applyConfig();
-		createPlayersFromConfig();
+		createPlayersFromConfig(true);
 		setOwnID(players.values().stream().filter(e -> e instanceof Player).findFirst().get().getID());
 		getOwnPlayer().setUsername(DEFAULT_USERNAME);
 		
@@ -430,7 +462,7 @@ public class Game implements Runnable {
 		
 		while (status == GameStatus.RUNNING) {
 			players.values().stream().filter(p -> !p.isDead()).forEachOrdered(p -> {
-				if (status != GameStatus.RUNNING) {
+				if (status != GameStatus.RUNNING || p.isDead()) {
 					return;
 				}
 				
@@ -448,20 +480,41 @@ public class Game implements Runnable {
 		gui.endScreen(ownID, getOwnPlayer().getStatus(), Duration.between(start, end), ret);
 	}
 	
-	private void destroyAll() {
-		recvThread.interrupt();
-		client.destroy();
-		serverThread.interrupt();
-		server.destroy();
+	public void destroyAll() throws IOException {
+		try {
+			if (serverThread != null) {
+				serverThread.interrupt();
+				server.destroy();
+			}
+			
+			if (recvThread != null) {
+				recvThread.interrupt();
+				client.destroy();
+			}
+			
+			File localSpritesFolder = new File(Main.CLIENT_SPRITE_PATH);
+			if (localSpritesFolder.exists()) {
+				File[] list = localSpritesFolder.listFiles();
+				if (list != null) {
+					for (File f : list) {
+						f.delete();
+					}
+				}
+				localSpritesFolder.delete();
+			}
+		} catch (Exception e) {
+			client.sendQuit();
+			throw e;
+		}
 	}
 	
 	public GUI getGUI() {
 		return gui;
 	}
 	
-	public void start() throws Exception {
+	public boolean start() throws Exception {
 		/*int mode = gui.getMode();
-		if (mode < 2) {
+		if (mode < 3) {
 			GameConfig conf;
 			try {
 				conf = gui.configGame();
@@ -473,29 +526,32 @@ public class Game implements Runnable {
 		}*/
 		
 		/* TODO TESTING SINGLE */
-		/*int mode = 0;
+		/*int mode = 1;
 		GameConfig conf = new GameConfig();
 		conf.setNumberOfBots(2);
-		conf.setBotsDifficulty(GameDifficulty.NORMAL);
+		conf.setBotsDifficulty(GameDifficulty.IMPOSSIBLE);
 		setGameConfig(conf);
 		/************************/		
 		
 		/* TODO TESTING SERVER */
-		int mode = 1;
+		int mode = 2;
 		GameConfig conf = new GameConfig();
-		conf.setNumberOfPlayers(1);
+		conf.setNumberOfPlayers(2);
 		conf.setNumberOfBots(1);
-		conf.setBotsDifficulty(GameDifficulty.NORMAL);
+		conf.setBotsDifficulty(GameDifficulty.IMPOSSIBLE);
 		setGameConfig(conf);
 		applyConfig();
 		/***********************/
 		
-		if (mode == 0) {
+		if (mode == 1) {
 			gameStart();
-		} else {
+		} else if (mode == 2) {
 			gameStartMulti();
 			destroyAll();
+		} else {
+			return false;
 		}
+		return true;
 	}
 
 	
@@ -504,36 +560,7 @@ public class Game implements Runnable {
 	/*			SERVER SIDE			 */
 	/*********************************/
 	
-	private void gameStartMulti() throws IOException {
-		// TODO String[] sessionInfo = gui.getMultiplayerMode();
-		
-		String[] sessionInfo = new String[2];
-		sessionInfo[0] = "Dev";
-		sessionInfo[1] = null;
-		
-		if (!createSession(sessionInfo)) {
-			return;
-		}
-		
-		// GAME SECONDO IL CLIENT
-		boolean go = false;
-		Board b;
-		do {
-			b = gui.placeShips();
-			client.sendBoard(b);
-			client.acquire();
-			if (resource instanceof Boolean) {
-				go = (Boolean) resource;
-			}
-		} while (!go);
-		getOwnPlayer().setBoard(b);
-		
-		gui.waitGameStart();
-		
-		Logger.write("LOCAL CLIENT END - GAME STARTED");		
-	}
-	
-	private void createAsHost() throws IOException {
+	private void createAsHost() throws Exception {
 		Game g = new Game();
 		g.setGUI(gui);
 		server = new Server(g);
@@ -544,17 +571,25 @@ public class Game implements Runnable {
 
 		client.sendConfiguration(config);
 		client.acquire();
+		// resource = false if not host, true if host
+		setResource(null);
+		
+		client.sendSprites(config.getShipsConfig());
+		client.acquire();
+		setResource(null);
 	}
 	
-	private void createAsClient(String ipAddress) {
+	private boolean createAsClient(String ipAddress) {
 		client = new Client(ipAddress, this);
 		if (client.getConnStatus() != ConnStatus.STATUS_OK) {
 			if (serverThread != null) {
 				serverThread.interrupt();
 			}
 			gui.errorScreen("Can't connect to server");
+			return false;
 		}
 		client.startRecvThread();
+		return true;
 	}
 	
 	public void createRecvThread() {
@@ -565,11 +600,13 @@ public class Game implements Runnable {
 	}
 	
 	// GUI INTERFACE
-	public boolean createSession(String[] sessionInfo) throws IOException {
+	public boolean createSession(String[] sessionInfo) throws Exception {
 		if (sessionInfo[1] == null) {
 			createAsHost();
 		} else {
-			createAsClient(sessionInfo[1]);
+			if (!createAsClient(sessionInfo[1])) {
+				return false;
+			}
 		}
 		
 		client.sendUsername(sessionInfo[0]);
@@ -580,7 +617,7 @@ public class Game implements Runnable {
 	
 	public void checkAllBoardsOk() {
 		for (Player p : players.values()) {
-			if (!(p instanceof Bot)) {
+			if (!(p instanceof Bot) && !p.didQuit()) {
 				for (Ship s : p.getBoard().getShips()) {
 					if (!s.isPlaced()) {
 						return;
@@ -601,6 +638,10 @@ public class Game implements Runnable {
 		sem.release();
 	}
 	
+	public int availablePermits() {
+		return sem.availablePermits();
+	}
+	
 	public void acquire() {
 		try {
 			sem.acquire();
@@ -611,24 +652,347 @@ public class Game implements Runnable {
 		this.server = server;
 	}
 	
+	private void queryBoard(UUID id) {
+		client.sendBoardRequest(id, getDebugString());
+		client.acquire();	// Wait BOARD message
+		
+		try {
+			ByteArrayInputStream in = new ByteArrayInputStream((byte[]) getResource());
+		    ObjectInputStream stream = new ObjectInputStream(in);
+		    byte[][] data = (byte[][]) stream.readObject();
+		    stream.close();
+			players.get(id).getBoard().setBoardMatrix(data);
+			setResource(null);
+		} catch (IOException | ClassNotFoundException e) {}
+	}
+	
+	private void showField() {
+		gui.showPlayerField();
+		Optional<Player> who = gui.getWhoPlayer("Who do you want to see (-1 go back)? ", players, getPlayersToIgnore());
+		if (who.isPresent()) {
+			queryBoard(who.get().getID());
+			gui.showField(who.get(), true);
+		}
+	}
+	
+	private boolean waitTurn() {
+		flipGenericStatus();
+		while (getGenericStatus() == GenericStatus.WAITING_MSG) {
+			GuiAction act = gui.getAction(true, true);
+			switch (act) {
+				case SHOW_FIELD:
+					showField();
+					break;
+				case CHAT:
+					String msg = gui.sendChat();
+					client.sendChatMessage(msg);
+					break;
+				case QUIT:
+					quitGame();
+					return false;
+				default:
+					break;
+			}
+		}
+		return true;
+	}
+	
+	private void playerAttackMulti() {
+		Set<UUID> ignored = getPlayersToIgnore();
+		ignored.addAll(attacked);
+		
+		gui.showPlayerField();
+		Optional<Player> who = gui.getWhoPlayer("Who do you want to attack? ", players, ignored);
+		
+		do {
+			Object[] ret = gui.attack(who);	// ret[0] = UUID, ret[1] = Integer x, ret[2] = Integer y
+			if (ret[0] == null) {
+				break;
+			}
+			
+			UUID u = (UUID) ret[0];
+			Player selected = players.get(u);
+			int x = (Integer) ret[1];
+			int y = (Integer) ret[2];
+			
+			client.sendAttack(u, x, y);
+			client.acquire();
+			AttackStatus as = (AttackStatus) getResource();
+			setResource(null);
+			
+			if (as == AttackStatus.HIT || as == AttackStatus.MISS || as == AttackStatus.SUNK) {
+				attacked.add(u);
+				break;
+			} else {
+				gui.invalidAttack("Invalid attack coordinates!");
+			}
+		} while (true);
+	}
+	
+	private void queryBoards() {
+		players.entrySet().stream().filter(e -> !e.getKey().equals(ownID) && !e.getValue().isDead()).forEach(e -> {
+			queryBoard(e.getKey());
+		});
+	}
+	
+	private void quitGame() {
+		client.sendQuit();
+		status = GameStatus.QUIT;
+	}
+	
+	private boolean playerTurnMulti() {
+		if (getOwnPlayer().getStatus() == PlayerStatus.LOSER) {
+			return true;
+		}
+		
+		queryBoards();
+		
+		attacked = new HashSet<>();
+		availablePlayers = getPlayersToNotIgnore();
+		
+		while (status == GameStatus.RUNNING) {
+			GuiAction act = gui.getAction(true, false);
+			switch (act) {
+				case SHOW_FIELD:
+					showField();
+					break;
+				case ATTACK:
+					playerAttackMulti();
+					if (attacked.containsAll(availablePlayers)) {
+						return true;
+					}
+					break;
+				case CHAT:
+					client.sendChatMessage(gui.sendChat());
+					break;
+				case QUIT:
+					quitGame();
+					return false;
+				default:
+					break;
+			}
+		}
+		return true;
+	}
+	
+	private void gameStartMulti() throws Exception {
+		try {
+			String[] sessionInfo = gui.getMultiplayerMode();
+			
+			if (!createSession(sessionInfo)) {
+				client.sendQuit();
+				return;
+			}
+			
+			if (!client.isConnected() || getErrMsg() != null) {
+				gui.errorScreen(getErrMsg());
+				return;
+			}
+			
+			localGame();
+		} catch (IOException e) {
+			client.sendQuit();
+			throw e;
+		}
+	}
+	
+	private void endGame() {
+		Object[] ret = (Object[]) getResource();
+		
+		Duration d = Duration.ofSeconds((Long) ret[0]);
+		UUID winner = (UUID) ret[1];
+		UUID[] ids = (UUID[]) ret[2];
+		String[] names = (String[]) ret[3];
+		Stats[] stats = (Stats[]) ret[4];
+		
+		PlayerStatus s = PlayerStatus.LOSER;
+		if (winner.equals(ownID)) {
+			s = PlayerStatus.WINNER;
+		}
+		
+		Map<UUID, Object[]> endObj = new HashMap<>();
+		for (int i = 0; i < ids.length; i++) {
+			Object[] arr = new Object[2];
+			arr[0] = names[i];
+			arr[1] = stats[i];
+			endObj.put(ids[i], arr);
+		}
+		
+		gui.endScreen(ownID, s, d, endObj);
+	}
+	
+	private void playerTurnServer(Bot current) {
+		Set<UUID> availablePlayers = getPlayersPred(e -> !e.getValue().isDead() && !e.getKey().equals(turn));
+		availablePlayers.forEach(u -> {
+			Player selected = players.get(u);
+			while (status == GameStatus.RUNNING) {
+				AttackStatus as = current.attack(selected);
+				if (as == AttackStatus.HIT || as == AttackStatus.MISS || as == AttackStatus.SUNK) {
+					current.updateStats(selected, as);
+					if (!(selected instanceof Bot)) {
+						server.getWorker(selected.getID()).sendMsg(Protocol.getGotAttackedMessage(current.getID(), selected.getBoard().getHits()));
+					}
+					
+					if (selected.getBoard().allShipsGone()) {
+						selected.setStatus(PlayerStatus.LOSER);
+						if (!(selected instanceof Bot)) {
+							server.getWorker(selected.getID()).sendMsg(Protocol.getEliminatedMessage(current.getID()));
+						}
+						server.broadcastPlayerElimination(selected.getID());
+						
+						if (checkIfWinner()) {
+							current.setStatus(PlayerStatus.WINNER);
+							status = GameStatus.END;
+						}
+					}
+					
+					break;
+				}
+			}
+		});
+	}
+	
+	public boolean playerAttackServer(ClientWorker attacker, ClientWorker defender, Object[] attack) {
+		UUID selected = (UUID) attack[0];
+		Set<UUID> ignored = getPlayersPred(e -> e.getValue().isDead() || e.getValue().getID().equals(turn));
+		ignored.addAll(attacked);
+		
+		if (turn.equals(selected) || players.get(turn).getStatus() != PlayerStatus.HAS_TURN || ignored.contains(selected) || players.get(selected).getStatus() != PlayerStatus.READY) {
+			return false;
+		} else {
+			AttackStatus as = players.get(turn).attack(players.get(selected), (Integer) attack[1], (Integer) attack[2]);
+			if (as == AttackStatus.HIT || as == AttackStatus.MISS || as == AttackStatus.SUNK) {
+				players.get(turn).updateStats(players.get(selected), as);
+				attacked.add(selected);
+				
+				attacker.sendMsg(Protocol.getAttackStatusMessage(as));
+				if (defender != null) {
+					defender.sendMsg(Protocol.getGotAttackedMessage(turn, players.get(selected).getBoard().getHits()));
+				}
+				
+				if (players.get(selected).getBoard().allShipsGone()) {
+					players.get(selected).setStatus(PlayerStatus.LOSER);
+					if (defender != null) {
+						defender.sendMsg(Protocol.getEliminatedMessage(turn));
+					}
+					server.broadcastPlayerElimination(selected);
+					
+					if (checkIfWinner()) {
+						players.get(turn).setStatus(PlayerStatus.WINNER);
+						status = GameStatus.END;
+					}
+				}
+				
+				return true;
+			}
+			attacker.sendMsg(Protocol.getAttackStatusMessage(AttackStatus.INVALID));
+			return false;
+		}
+	}
+	
+	private void playerTurnServer(Player current) {
+		server.broadcastTurn(current.getID());
+		
+		if (current instanceof Bot) {
+			playerTurnServer((Bot) current);
+			return;
+		}
+		
+		attacked = new HashSet<>();
+		availablePlayers = getPlayersPred(e -> !e.getValue().isDead() && !e.getKey().equals(turn));
+		
+		acquire();	// waiting current player attacks to all available players | current player quit
+	}
+	
+	private void localGame() {
+		// GAME SECONDO IL CLIENT LOCALE
+		client.acquire();
+		client.acquire();
+		client.acquire();
+		if (server == null) {
+			client.acquire();
+		}
+		generateBoards();
+				
+		boolean go = false;
+		Board b;
+		do {
+			b = gui.placeShips();
+			client.sendBoard(b);
+			client.acquire();
+			if (resource instanceof Boolean) {
+				go = (Boolean) resource;
+				setResource(null);
+			}
+		} while (!go);
+					
+		getOwnPlayer().setBoard(b);
+					
+		System.out.println("QUIA");
+		gui.waitGameStart();
+		System.out.println("YOT");
+		client.write("Received game start");
+		client.write("Local ID: " + ownID);
+					
+		status = GameStatus.RUNNING;
+		while (status == GameStatus.RUNNING) {
+			if (status == GameStatus.RUNNING && waitTurn()) {
+				if (status == GameStatus.RUNNING) {
+					playerTurnMulti();
+				}
+			}
+		}
+				
+		client.write("Local game end msg");
+			if (status != GameStatus.QUIT) {
+				endGame();
+		}
+	}
+	
 	@Override
 	public void run() {
 		// GAME SECONDO IL SERVER
+		createPlayersFromConfig(false);
+		
 		status = GameStatus.PLACING;
 		players.values().stream().filter(e -> e instanceof Bot).forEach(b -> ((Bot) b).placeShips());
+		players.values().forEach(e -> e.setStatus(PlayerStatus.READY));
 		acquire();
 		
 		server.broadcastMatchStart();
+		server.write("Game started");
 		
-		Logger.write("SERVER END - GAME PARTITO!");
-	}
-
-	@Override
-	public String toString() {
-		return "Game [serverThread=" + serverThread + ", server=" + server + ", sem=" + sem + ", recvThread="
-				+ recvThread + ", client=" + client + ", config=" + config + ", players=" + players + ", gui=" + gui
-				+ ", ownID=" + ownID + ", turn=" + turn + ", status=" + status + ", start=" + start + ", end=" + end
-				+ ", genericStatus=" + genericStatus + ", errMsg=" + errMsg + ", resource=" + resource + "]";
+		status = GameStatus.RUNNING;
+		start = Instant.now();
+		
+		while (status == GameStatus.RUNNING) {
+			players.values().stream().filter(p -> !p.isDead()).forEachOrdered(p -> {
+				if (status != GameStatus.RUNNING || p.isDead() || p.didQuit()) {
+					return;
+				}
+				
+				turn = p.getID();
+				p.setStatus(PlayerStatus.HAS_TURN);
+				playerTurnServer(p);
+				if (p.getStatus() == PlayerStatus.HAS_TURN) {
+					p.setStatus(PlayerStatus.READY);
+				}
+			});
+			
+			Set<UUID> quit = new HashSet<>();
+			players.values().forEach(e -> {
+				if (e.didQuit()) {
+					quit.add(e.getID());
+				}
+			});
+			
+			quit.forEach(e -> players.remove(e));
+		}
+		
+		if (status == GameStatus.END) {
+			end = Instant.now();
+			server.broadcastMatchEnd(Duration.between(start, end), turn, players);
+		}
 	}
 	
 }

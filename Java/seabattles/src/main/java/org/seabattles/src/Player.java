@@ -12,7 +12,8 @@ public class Player implements PlayerInterface {
 		READY,			// Ships placed
 		HAS_TURN,		// It's his turn
 		WINNER,			// He won
-		LOSER			// He lost
+		LOSER,			// He lost
+		QUIT			// He left the game
 	};
 	
 	public enum PlayerGrade {
@@ -20,7 +21,8 @@ public class Player implements PlayerInterface {
 		B,				// 79% - 70% shots hit
 		C,				// 69% - 56% shots hit
 		D,				// 55% - 40% shots hit
-		F				// < 40% shots hit
+		F,				// < 40% shots hit
+		NAN
 	};
 
 	public static byte id_counter = 0;
@@ -54,6 +56,10 @@ public class Player implements PlayerInterface {
 	
 	public boolean isDead() {
 		return status == PlayerStatus.LOSER;
+	}
+	
+	public boolean didQuit() {
+		return status == PlayerStatus.QUIT;
 	}
 	
 	// GUI interface

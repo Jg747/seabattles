@@ -1,12 +1,18 @@
 package org.seabattles.src;
 
+import java.time.Duration;
+import java.time.Instant;
+
 import org.seabattles.gui.ascii.AsciiGUI;
 
 public class Main {
 	
 	public static final String name = "SEABATTLES";
 	public static final String version = "0.0.1";
-
+	public static boolean DEBUG_MODE = true;
+	public static final String SERVER_SPRITE_PATH = "seabattles_tmp_sprites_server";
+	public static final String CLIENT_SPRITE_PATH = "seabattles_tmp_sprites_client";
+	
 	public static void main(String[] args) throws Exception {
 		Game g = new Game();
 		g.setGUI(new AsciiGUI(args, g));
@@ -15,18 +21,23 @@ public class Main {
 		try {
 			g.start();
 		} catch (Exception e) {
-			if (g.isServer()) {
-				g.destroyServer();
-			}
+			System.err.println(e.getMessage());
+			e.printStackTrace();
+			g.destroyAll();
 		}
-		
-		//test();
+		// TODO STATS NON CORRETTE
+		// test();
 	}
 
 	private static void test() throws Exception {
-		Game g = new Game();
-		Game g2 = new Game();
-		System.out.println(g.toString() + "\n" + g2.toString());
+		Instant prima = Instant.now();
+		Thread.sleep(2000);
+		Instant dopo = Instant.now();
+		
+		Duration d = Duration.between(prima, dopo);
+		System.out.println(d.getSeconds());
+		Duration d2 = Duration.ofSeconds(d.getSeconds());
+		System.out.println(d2.getSeconds());
 	}
 	
 }
