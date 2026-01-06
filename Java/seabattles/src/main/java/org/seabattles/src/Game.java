@@ -60,7 +60,6 @@ public class Game implements Runnable {
 	private GUI gui;
 	
 	public static final int MAX_PLAYERS = 4;
-	public static final String DEBUG_STRING = "debug_string";
 	private static final String DEFAULT_USERNAME = "You";
 	
 	private UUID ownID;
@@ -76,8 +75,6 @@ public class Game implements Runnable {
 	private Set<UUID> attacked;
 	private Set<UUID> availablePlayers;
 	
-	private String debugString;
-	
  	public Game() {
 		config = new GameConfig();
 		status = GameStatus.CONFIG;
@@ -92,16 +89,7 @@ public class Game implements Runnable {
 		players = new LinkedHashMap<>();
 		
 		sem = new Semaphore(0);
-		debugString = DEBUG_STRING; // TODO debugString = null;
 	}
- 	
- 	public void setDebugString(String dbg) {
- 		debugString = dbg;
- 	}
- 	
- 	public String getDebugString() {
- 		return debugString;
- 	}
  	
  	public boolean isServer() {
  		return server != null || serverThread != null;
@@ -359,7 +347,6 @@ public class Game implements Runnable {
 			} else {
 				AttackStatus as = players.get(turn).attack(selected, x, y);
 				if (as == AttackStatus.HIT || as == AttackStatus.MISS || as == AttackStatus.SUNK) {
-					players.get(turn).updateStats(selected, as);
 					attacked.add(u);
 					
 					if (selected.getBoard().allShipsGone()) {
@@ -513,17 +500,17 @@ public class Game implements Runnable {
 	}
 	
 	public boolean start() throws Exception {
-		/*int mode = gui.getMode();
+		int mode = gui.getMode();
 		if (mode < 3) {
 			GameConfig conf;
 			try {
 				conf = gui.configGame();
 			} catch (Exception e) {
 				System.err.println("File default di configurazione non trovato, terminazione");
-				return;
+				return false;
 			}
 			setGameConfig(conf);
-		}*/
+		}
 		
 		/* TODO TESTING SINGLE */
 		/*int mode = 1;
@@ -533,7 +520,7 @@ public class Game implements Runnable {
 		setGameConfig(conf);
 		/************************/		
 		
-		/* TODO TESTING SERVER */
+		/* TODO TESTING SERVER
 		int mode = 2;
 		GameConfig conf = new GameConfig();
 		conf.setNumberOfPlayers(2);
@@ -653,7 +640,7 @@ public class Game implements Runnable {
 	}
 	
 	private void queryBoard(UUID id) {
-		client.sendBoardRequest(id, getDebugString());
+		client.sendBoardRequest(id, Main.DEBUG_MODE ? Main.DEBUG_STRING : "");
 		client.acquire();	// Wait BOARD message
 		
 		try {
@@ -862,7 +849,6 @@ public class Game implements Runnable {
 		} else {
 			AttackStatus as = players.get(turn).attack(players.get(selected), (Integer) attack[1], (Integer) attack[2]);
 			if (as == AttackStatus.HIT || as == AttackStatus.MISS || as == AttackStatus.SUNK) {
-				players.get(turn).updateStats(players.get(selected), as);
 				attacked.add(selected);
 				
 				attacker.sendMsg(Protocol.getAttackStatusMessage(as));

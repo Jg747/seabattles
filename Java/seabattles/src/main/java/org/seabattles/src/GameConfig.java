@@ -100,6 +100,10 @@ public class GameConfig {
 		for (int i = 0; i < shipsConfig.length; i++) {
 			shipsConfig[i] = new ShipConfig(ships.getJSONObject(i));
 		}
+		
+		if (json.getString("debug").equals(Main.DEBUG_STRING)) {
+			Main.DEBUG_MODE = true;
+		}
 	}
 	
 	public void setShipsConfigArray(ShipConfig[] config) {

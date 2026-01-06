@@ -9,11 +9,16 @@ public class Main {
 	
 	public static final String name = "SEABATTLES";
 	public static final String version = "0.0.1";
-	public static boolean DEBUG_MODE = true;
+	public static boolean DEBUG_MODE = false;
+	public static String DEBUG_STRING = "";	// dbg=cheating_string
 	public static final String SERVER_SPRITE_PATH = "seabattles_tmp_sprites_server";
 	public static final String CLIENT_SPRITE_PATH = "seabattles_tmp_sprites_client";
 	
 	public static void main(String[] args) throws Exception {
+		if (args.length == 1 && args[0].startsWith("dbg=")) {
+			DEBUG_STRING = args[0].substring(4);
+		}
+		
 		Game g = new Game();
 		g.setGUI(new AsciiGUI(args, g));
 		Logger.setGUI(g.getGUI());
@@ -25,7 +30,7 @@ public class Main {
 			e.printStackTrace();
 			g.destroyAll();
 		}
-		// TODO STATS NON CORRETTE
+
 		// test();
 	}
 

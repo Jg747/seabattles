@@ -117,6 +117,7 @@ public class Player implements PlayerInterface {
 				stats.incMiss();
 				break;
 			case SUNK:
+				stats.incHit();
 				stats.incSunk();
 				if (who.getBoard().allShipsGone()) {
 					stats.incEliminations();

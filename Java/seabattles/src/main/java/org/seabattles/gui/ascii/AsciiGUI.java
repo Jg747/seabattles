@@ -154,7 +154,7 @@ public class AsciiGUI implements GUI {
 		boolean done = false;
 		Ship[] ships = b.getShips();
 		
-		/******* TODO TESTING *******/
+		/******* TODO TESTING ******
 		ships[0].setX(5);
 		ships[0].setY(5);
 		ships[0].rotate(0);
@@ -169,18 +169,18 @@ public class AsciiGUI implements GUI {
 		ships[3].rotate(3);
 		ships[4].setX(2);
 		ships[4].setY(1);
-		ships[4].rotate(3);*/
+		ships[4].rotate(3);
 		for (Ship s : ships) {
 			b.placeShip(s);
 		}
 		return b;
 		/******* TODO TESTING *******/
 		
-		/*do {
+		do {
 			printTitle();
-			showBoard(b);
+			showBoard(b, true);
 			if (done) {
-				if (yesNoQuestion("All ships placed, do you want to proceed? ")) {
+				if (boolQuestion("All ships placed, do you want to proceed? ")) {
 					break;
 				}
 			}
@@ -216,7 +216,7 @@ public class AsciiGUI implements GUI {
 				}
 			}
 		} while (true);
-		return b.getHits();*/
+		return b;
 	}
 	
 	private void sleep(long millis) {
@@ -538,6 +538,7 @@ public class AsciiGUI implements GUI {
 		println("1. Host match\n2. Connect to match");
 		int choice = numberChoice("Choice: ", 1, 2);
 		
+		/* TODO TESTING
 		if (choice == 1) {
 			ret[0] = "HOST";
 			ret[1] = null;
@@ -545,8 +546,9 @@ public class AsciiGUI implements GUI {
 			ret[0] = "NOT_HOST";
 			ret[1] = "127.0.0.1";
 		}
-		// TODO
-		/*print("Username: ");
+		/* TODO TESTING */
+		
+		print("Username: ");
 		String name = scan.nextLine();
 		name = name.trim().strip();
 		if (name.contains(" ")) {
@@ -569,7 +571,7 @@ public class AsciiGUI implements GUI {
 				break;
 			default:
 				break;
-		}*/
+		}
 		
 		return ret;
 	}

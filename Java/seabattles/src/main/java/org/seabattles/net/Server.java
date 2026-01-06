@@ -420,7 +420,7 @@ public class Server implements Runnable {
 	private void parseBoardRequest(UUID id, JSONObject msg) {
 		Object[] arr = Protocol.parseBoardRequestMessage(msg);
 		boolean debug = false;
-		if (((String) arr[1]).equals(Game.DEBUG_STRING)) {
+		if (((String) arr[1]).equals(Main.DEBUG_STRING)) {
 			debug = true;
 		}
 		UUID playerId = (UUID) arr[0];
