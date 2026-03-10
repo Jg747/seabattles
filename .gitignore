@@ -8,4 +8,3 @@ bin
 test*
 .DS_store
 .clang_complete
-*.class
