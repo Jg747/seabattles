@@ -2,3 +2,5 @@
 /dest/
 /.settings/
 *.class
+*.log
+test_*
